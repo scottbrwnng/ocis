@@ -29,7 +29,7 @@ class Searcher:
         return s
 
     def search(self, x:dict) -> dict: # NOTE: the combination of fips4 and casenumber, and division type should return 1 result
-        while True:                    # - For case details required fields in payload are
+        while True:                    # - case details required fields in payload are
             try:                       # qualifiedFips, courtLevel, divisionType, caseNumber
                 res = self.session.post(
                     'https://eapps.courts.state.va.us/ocis-rest/api/public/getCaseDetails',
