@@ -1,0 +1,151 @@
+cells:
+  - kind: 2
+    languageId: sql
+    value: SET preserve_insertion_order = false;
+    metadata: {}
+  - kind: 2
+    languageId: sql
+    value: >-
+      CREATE OR REPLACE TABLE CASES AS 
+
+      WITH Q1 AS (
+          SELECT 
+              unnest(context.entity.payload.searchResults, recursive := True) AS HI,
+              filename
+          FROM read_json('./dumps/*.json')
+      )
+
+      SELECT * FROM Q1
+    metadata: {}
+  - kind: 2
+    languageId: sql
+    value: >-
+      WITH Q1 AS (
+          SELECT 
+              unnest(context.entity.payload.searchResults, recursive := True) AS HI,
+              filename
+          FROM read_json('./dumps/*.json')
+          where filename not in (select filename from cases)
+      )
+
+      INSERT INTO CASES
+
+      SELECT * FROM Q1
+    metadata: {}
+  - kind: 2
+    languageId: sql
+    value: >-
+      CREATE OR REPLACE TABLE CASE_DTL_FINISHED AS 
+
+      WITH Q1 AS (
+          SELECT
+              context.entity.payload,
+              filename
+          from read_json('./dtl/*.json', maximum_depth:=5)
+      )
+
+      SELECT DISTINCT
+          replace(payload.caseCourt.fipsCode, '"', '') || replace(payload.caseCourt.courtCategoryCode.value, '"', '') AS qualifiedFips,
+          replace(payload.caseCourt.courtCategoryCode.value, '"', '') as courtLevel,
+          replace(payload.caseCategory.caseCategoryCode, '"', '') as divisionType,
+          payload.caseTrackingID as caseNumber
+      FROM Q1
+    metadata: {}
+  - kind: 2
+    languageId: sql
+    value: |-
+      create or replace table code_mapping as 
+      SELECT  
+          unnest(context.entity.payload, recursive :=True)
+      from read_json('codemapping.json')
+    metadata: {}
+  - kind: 2
+    languageId: sql
+    value: |-
+      create or replace table court_mapping as 
+      SELECT  
+          unnest(context.entity.payload.allCourts, recursive :=True)
+      from read_json('courtmapping.json')
+    metadata: {}
+  - kind: 2
+    languageId: sql
+    value: >-
+      WITH Q1 AS (
+          SELECT
+              context.entity.payload,
+              filename
+          from read_json('./dtl/*.json', maximum_depth:=5)
+      ),
+
+      HI AS (
+          SELECT DISTINCT
+              payload.caseTrackingID,
+              payload.caseCourt.fipsCode || payload.caseCourt.courtCategoryCode.value AS qualifiedFips
+          FROM Q1
+      )
+
+
+      SELECT DISTINCT
+          qualifiedFips,
+          courtLevel,
+          divisionType,
+          caseNumber
+      FROM CASES
+
+      WHERE NOT EXISTS (FROM HI WHERE HI.qualifiedFips = CASES.qualifiedFips AND
+      HI.caseTrackingID = CASES.caseNumber)
+
+      --LIMIT 1000
+    metadata: {}
+  - kind: 2
+    languageId: sql
+    value: |-
+      WITH Q1 AS (
+          SELECT DISTINCT
+              qualifiedFips,
+              courtLevel,
+              divisionType,
+              caseNumber
+          FROM CASES
+          EXCEPT
+          SELECT DISTINCT
+              qualifiedFips,
+              courtLevel,
+              divisionType,
+              caseNumber
+          FROM CASE_DTL_FINISHED
+      ),
+
+      Q2 AS (
+          SELECT  
+              *,
+              ROW_NUMBER() OVER() AS RN
+          FROM Q1
+      )
+
+      SELECT
+          *,
+          CASE 
+              WHEN RN BETWEEN 0 AND 1000_000 THEN 0
+              WHEN RN BETWEEN 1_000_000 AND 1_999_999 THEN 1
+              WHEN RN BETWEEN 2_000_000 AND 2_999_999 THEN 2
+              WHEN RN BETWEEN 3_000_000 AND 3_999_999 THEN 3
+              WHEN RN BETWEEN 4_000_000 AND 4_999_999 THEN 4
+              ELSE 0 END AS PART
+      FROM Q2
+      WHERE PART = 0
+    metadata: {}
+  - kind: 2
+    languageId: sql
+    value: describe
+    metadata: {}
+  - kind: 2
+    languageId: sql
+    value: ""
+    metadata: {}
+metadata:
+  conn:
+    id: RA5R8Ge48YeNN_xf9eOZw
+    name: ocis
+  database: api
+  schema: main
