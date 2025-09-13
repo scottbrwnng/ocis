@@ -20,7 +20,7 @@ class Searcher:
     def create_session(self):
         headers = {
             "Accept": "application/json",
-            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Safari/605.1.15",
+            # "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Safari/605.1.15", #TODO: figure out what this is
             "Content-Type": "application/json;charset=UTF-8",
             'Cookie': f'OES_TC_JSESSIONID={self.cookie}'
         }
@@ -28,7 +28,7 @@ class Searcher:
         s.headers=headers
         return s
 
-    def search(self, x:dict) -> dict: # NOTE: the combination of fips4 and case number should return 1 result
+    def search(self, x:dict) -> dict: # NOTE: the combination of fips4 and casenumber, and division type should return 1 result
         while True:                    # - For case details required fields in payload are
             try:                       # qualifiedFips, courtLevel, divisionType, caseNumber
                 res = self.session.post(
@@ -46,26 +46,30 @@ class Searcher:
         return res
     
     def write_json(self, res:dict):
-        case = res['context']['entity']['payload']['caseTrackingID']
-        fips = res['context']['entity']['payload']['caseCourt']['fipsCode'] \
-            + res['context']['entity']['payload']['caseCourt']['courtCategoryCode']['value']
+        pay = res['context']['entity']['payload']
+        case = pay['caseTrackingID']
+        fips = pay['caseCourt']['fipsCode'] + pay['caseCourt']['courtCategoryCode']['value']
+        div = pay['caseCategory']['caseCategoryCode']
         try:
-            with open(f'./dtl/{fips}_{case}.json', 'x', encoding='utf-8') as f:
-                json.dump(res, f, indent=4)
+            with open(f'./dtl/{fips}_{case}_{div}.json', 'x', encoding='utf-8') as f:
+                json.dump(pay, f, indent=4)
         except FileExistsError:
             print('File already exists, skipping write.')
-
-        
+            
 
 def query_payload() -> list[dict]:
     with ddb.connect('ocis') as conn:
         sql = '''
-            SELECT * FROM V_TODO
+            SELECT 
+                qualifiedFips,
+                courtLevel,
+                divisionType,
+                caseNumber
+            FROM V_TODO
             WHERE PART = ?
         '''
         res = conn.execute(sql, [PARTITION]).fetchall()
         return [{'qualifiedFips': r[0], 'courtLevel': r[1], 'divisionType': r[2], 'caseNumber': r[3]} for r in res]
-
 
 def get_cookie():
     while True:
@@ -78,18 +82,16 @@ def get_cookie():
             print('get cookie failed')
     return cookie
 
-
-
 def chunk_list(lst: list, n: int) -> list[list]:
     k, m = divmod(len(lst), n)
     return [lst[i * k + min(i, m):(i + 1) * k + min(i + 1, m)] for i in range(n)]
-
 
 def run(payload_group:list[dict], cookie:str):
     search = Searcher(cookie)
     for x in payload_group:
         res = search.search(x)
         search.write_json(res)
+
 
 if __name__ == '__main__':
     threads = 8

@@ -6,7 +6,7 @@ cells:
   - kind: 2
     languageId: sql
     value: >-
-      CREATE OR REPLACE TABLE CASES AS 
+      CREATE OR REPLACE TABLE CASES_STGN AS 
 
       WITH Q1 AS (
           SELECT 
@@ -15,34 +15,34 @@ cells:
           FROM read_json('./dumps/*.json')
       )
 
-      SELECT * FROM Q1
+      SELECT * FROM Q1;
+
+
+      CREATE OR REPLACE TABLE CASES AS
+
+      SELECT DISTINCT
+          *
+      FROM CASES_STGN
+
+      ORDER BY qualifiedFips;
     metadata: {}
   - kind: 2
     languageId: sql
     value: >-
-      WITH Q1 AS (
-          SELECT 
-              unnest(context.entity.payload.searchResults, recursive := True) AS HI,
+      CREATE OR REPLACE TABLE CASE_DTL_STGN AS
+          SELECT
+              caseCourt.fipsCode || caseCourt.courtCategoryCode.value as qualifiedFips,
+              caseCourt.courtCategoryCode.value as courtLevel,
+              caseCategory.caseCategoryCode as divisionType,
+              caseTrackingID as caseNumber,
               filename
-          FROM read_json('./dumps/*.json')
-          where filename not in (select filename from cases)
-      )
+          FROM read_json('./dtl/*.json');
 
-      INSERT INTO CASES
-
-      SELECT * FROM Q1
-    metadata: {}
-  - kind: 2
-    languageId: sql
-    value: >-
-      CREATE OR REPLACE TABLE CASE_DTL_FINISHED AS 
+      CREATE OR REPLACE TABLE CASE_DTL AS
           SELECT DISTINCT
-              replace(context.entity.payload.caseCourt.fipsCode, '"', '') || replace(context.entity.payload.caseCourt.courtCategoryCode.value, '"', '') AS qualifiedFips,
-              replace(context.entity.payload.caseCourt.courtCategoryCode.value, '"', '') as courtLevel,
-              replace(context.entity.payload.caseCategory.caseCategoryCode, '"', '') as divisionType,
-              context.entity.payload.caseTrackingID as caseNumber,
-              filename
-          FROM read_json('./dtl/*.json', maximum_depth:=5)
+              *
+          FROM CASE_DTL_STGN
+          ORDER BY qualifiedFips;
     metadata: {}
   - kind: 2
     languageId: sql
@@ -62,8 +62,9 @@ cells:
     metadata: {}
   - kind: 2
     languageId: sql
-    value: |-
+    value: >-
       CREATE OR REPLACE VIEW V_TODO AS 
+
       WITH Q1 AS (
           SELECT
               qualifiedFips,
@@ -77,8 +78,9 @@ cells:
               courtLevel,
               divisionType,
               caseNumber
-          FROM CASE_DTL_FINISHED
+          FROM CASE_DTL
       ),
+
 
       Q2 AS (
           SELECT  
@@ -86,9 +88,10 @@ cells:
               courtLevel,
               divisionType,
               caseNumber,
-              ROW_NUMBER() OVER(ORDER BY qualifiedFips, caseNumber) AS RN
+              ROW_NUMBER() OVER(ORDER BY qualifiedFips, courtLevel, divisionType, caseNumber) AS RN
           FROM Q1
       )
+
 
       SELECT
           qualifiedFips,
@@ -97,7 +100,7 @@ cells:
           caseNumber,
           RN,
           CASE 
-              WHEN RN BETWEEN 0 AND 1000_000 THEN 0
+              WHEN RN BETWEEN 0 AND 999_999 THEN 0
               WHEN RN BETWEEN 1_000_000 AND 1_999_999 THEN 1
               WHEN RN BETWEEN 2_000_000 AND 2_999_999 THEN 2
               WHEN RN BETWEEN 3_000_000 AND 3_999_999 THEN 3
@@ -111,7 +114,7 @@ cells:
     metadata: {}
 metadata:
   conn:
-    id: RA5R8Ge48YeNN_xf9eOZw
+    id: 2aRkzf3RdWMovp6T1AKHw
     name: ocis
-  database: api
+  database: ocis
   schema: main
