@@ -36,25 +36,18 @@ cells:
     languageId: sql
     value: >-
       CREATE OR REPLACE TABLE CASE_DTL_FINISHED AS 
-
-      WITH Q1 AS (
-          SELECT
-              context.entity.payload,
+          SELECT DISTINCT
+              replace(context.entity.payload.caseCourt.fipsCode, '"', '') || replace(context.entity.payload.caseCourt.courtCategoryCode.value, '"', '') AS qualifiedFips,
+              replace(context.entity.payload.caseCourt.courtCategoryCode.value, '"', '') as courtLevel,
+              replace(context.entity.payload.caseCategory.caseCategoryCode, '"', '') as divisionType,
+              context.entity.payload.caseTrackingID as caseNumber,
               filename
-          from read_json('./dtl/*.json', maximum_depth:=5)
-      )
-
-      SELECT DISTINCT
-          replace(payload.caseCourt.fipsCode, '"', '') || replace(payload.caseCourt.courtCategoryCode.value, '"', '') AS qualifiedFips,
-          replace(payload.caseCourt.courtCategoryCode.value, '"', '') as courtLevel,
-          replace(payload.caseCategory.caseCategoryCode, '"', '') as divisionType,
-          payload.caseTrackingID as caseNumber
-      FROM Q1
+          FROM read_json('./dtl/*.json', maximum_depth:=5)
     metadata: {}
   - kind: 2
     languageId: sql
     value: |-
-      create or replace table code_mapping as 
+      CREATE OR REPLACE TABLE CODE_MAPPING as 
       SELECT  
           unnest(context.entity.payload, recursive :=True)
       from read_json('codemapping.json')
@@ -62,53 +55,24 @@ cells:
   - kind: 2
     languageId: sql
     value: |-
-      create or replace table court_mapping as 
+      CREATE OR REPLACE TABLE COURT_MAPPING AS 
       SELECT  
           unnest(context.entity.payload.allCourts, recursive :=True)
       from read_json('courtmapping.json')
     metadata: {}
   - kind: 2
     languageId: sql
-    value: >-
+    value: |-
+      CREATE OR REPLACE VIEW V_TODO AS 
       WITH Q1 AS (
           SELECT
-              context.entity.payload,
-              filename
-          from read_json('./dtl/*.json', maximum_depth:=5)
-      ),
-
-      HI AS (
-          SELECT DISTINCT
-              payload.caseTrackingID,
-              payload.caseCourt.fipsCode || payload.caseCourt.courtCategoryCode.value AS qualifiedFips
-          FROM Q1
-      )
-
-
-      SELECT DISTINCT
-          qualifiedFips,
-          courtLevel,
-          divisionType,
-          caseNumber
-      FROM CASES
-
-      WHERE NOT EXISTS (FROM HI WHERE HI.qualifiedFips = CASES.qualifiedFips AND
-      HI.caseTrackingID = CASES.caseNumber)
-
-      --LIMIT 1000
-    metadata: {}
-  - kind: 2
-    languageId: sql
-    value: |-
-      WITH Q1 AS (
-          SELECT DISTINCT
               qualifiedFips,
               courtLevel,
               divisionType,
               caseNumber
           FROM CASES
           EXCEPT
-          SELECT DISTINCT
+          SELECT
               qualifiedFips,
               courtLevel,
               divisionType,
@@ -118,13 +82,20 @@ cells:
 
       Q2 AS (
           SELECT  
-              *,
-              ROW_NUMBER() OVER() AS RN
+              qualifiedFips,
+              courtLevel,
+              divisionType,
+              caseNumber,
+              ROW_NUMBER() OVER(ORDER BY qualifiedFips, caseNumber) AS RN
           FROM Q1
       )
 
       SELECT
-          *,
+          qualifiedFips,
+          courtLevel,
+          divisionType,
+          caseNumber,
+          RN,
           CASE 
               WHEN RN BETWEEN 0 AND 1000_000 THEN 0
               WHEN RN BETWEEN 1_000_000 AND 1_999_999 THEN 1
@@ -133,11 +104,6 @@ cells:
               WHEN RN BETWEEN 4_000_000 AND 4_999_999 THEN 4
               ELSE 0 END AS PART
       FROM Q2
-      WHERE PART = 0
-    metadata: {}
-  - kind: 2
-    languageId: sql
-    value: describe
     metadata: {}
   - kind: 2
     languageId: sql

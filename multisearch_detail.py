@@ -60,39 +60,7 @@ class Searcher:
 def query_payload() -> list[dict]:
     with ddb.connect('ocis') as conn:
         sql = '''
-            WITH Q1 AS (
-                SELECT DISTINCT
-                    qualifiedFips,
-                    courtLevel,
-                    divisionType,
-                    caseNumber
-                FROM CASES
-                EXCEPT
-                SELECT DISTINCT
-                    qualifiedFips,
-                    courtLevel,
-                    divisionType,
-                    caseNumber
-                FROM CASE_DTL_FINISHED
-            ),
-
-            Q2 AS (
-                SELECT  
-                    *,
-                    ROW_NUMBER() OVER() AS RN
-                FROM Q1
-            )
-
-            SELECT
-                *,
-                CASE 
-                    WHEN RN BETWEEN 0 AND 999_999 THEN 0
-                    WHEN RN BETWEEN 1_000_000 AND 1_999_999 THEN 1
-                    WHEN RN BETWEEN 2_000_000 AND 2_999_999 THEN 2
-                    WHEN RN BETWEEN 3_000_000 AND 3_999_999 THEN 3
-                    WHEN RN BETWEEN 4_000_000 AND 4_999_999 THEN 4
-                    ELSE 0 END AS PART
-            FROM Q2
+            SELECT * FROM V_TODO
             WHERE PART = ?
         '''
         res = conn.execute(sql, [PARTITION]).fetchall()
