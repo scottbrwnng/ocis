@@ -29,6 +29,12 @@ cells:
   - kind: 2
     languageId: sql
     value: >-
+      -- <375000: 3m 40s
+
+      -- 397822: 3m 42s
+
+      -- 520790: 4m 3s (while watching youtube)
+
       CREATE OR REPLACE TABLE CASE_DTL_STGN AS
           SELECT
               caseCourt.fipsCode || caseCourt.courtCategoryCode.value as qualifiedFips,
@@ -105,12 +111,8 @@ cells:
               WHEN RN BETWEEN 2_000_000 AND 2_999_999 THEN 2
               WHEN RN BETWEEN 3_000_000 AND 3_999_999 THEN 3
               WHEN RN BETWEEN 4_000_000 AND 4_999_999 THEN 4
-              ELSE 0 END AS PART
+              ELSE 5 END AS PART
       FROM Q2
-    metadata: {}
-  - kind: 2
-    languageId: sql
-    value: ""
     metadata: {}
 metadata:
   conn:

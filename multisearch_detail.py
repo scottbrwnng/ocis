@@ -5,6 +5,7 @@ from datetime import date, timedelta
 import time
 import warnings
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from threading import Lock
 import random
 import sys
 from proxy import proxy_list
@@ -13,8 +14,11 @@ warnings.filterwarnings('ignore')
 
 PARTITION = int(sys.argv[1])
 
+counter_lock = Lock()
+
 class Searcher:
-    def __init__(self, cookie:str) -> None:
+    
+    def __init__(self, cookie:str, size:int) -> None:
         self.cookie = cookie
         self.session = self.create_session()
         self.proxy = random.choice(proxy_list)
@@ -30,6 +34,7 @@ class Searcher:
         return s
 
     def search(self, x:dict) -> dict: # NOTE: the combination of fips4 and casenumber, and division type should return 1 result
+        global global_counter
         while True:                    # - case details required fields in payload are
             try:                       # qualifiedFips, courtLevel, divisionType, caseNumber
                 res = self.session.post(
@@ -39,7 +44,10 @@ class Searcher:
                     timeout = 5,
                     proxies = {'http': self.proxy, 'https': self.proxy}
                 ).json()
-                print('successful response. Time: ', round(time.time(), 3))
+                with counter_lock:  # safe increment
+                    global_counter -= 1
+                    left = global_counter
+                print(f'success. {left} remaining.')
                 break
             except:
                 print(f'request failed for proxy: {self.proxy}')
@@ -92,7 +100,8 @@ def chunk_list(lst: list, n: int) -> list[list]:
 
 
 def run(payload_group:list[dict], cookie:str):
-    search = Searcher(cookie)
+
+    search = Searcher(cookie, size = len(payload_group))
     for x in payload_group:
         res = search.search(x)
         search.write_json(res)
@@ -101,6 +110,7 @@ def run(payload_group:list[dict], cookie:str):
 if __name__ == '__main__':
     threads = 8
     payload = query_payload()
+    global_counter = len(payload)
     cookie = get_cookie()
     payload_groups = chunk_list(payload, threads)
     with ThreadPoolExecutor(max_workers=threads) as executor:
