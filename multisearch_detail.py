@@ -92,7 +92,7 @@ def get_cookie():
     return cookie
 
 
-def chunk_list(lst: list, n: int) -> list[list]:
+def chunk(lst: list, n: int) -> list[list]:
     k, m = divmod(len(lst), n)
     return [lst[i * k + min(i, m):(i + 1) * k + min(i + 1, m)] for i in range(n)]
 
@@ -114,7 +114,7 @@ def run(payload_group:list[dict], cookie:str):
 if __name__ == '__main__':
     threads = 8
     payload = query_payload()
-    payload_groups = chunk_list(payload, threads)
+    payload_groups = chunk(payload, threads)
     cookie = get_cookie()
 
     global_counter = len(payload)

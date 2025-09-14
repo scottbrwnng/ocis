@@ -43,6 +43,12 @@ cells:
 
       -- 1248157: 12m
 
+      -- 1405259: 14m 3s
+
+      -- 1594289: 13m 2s
+
+      -- 1830937: 14m 14s
+
       SET preserve_insertion_order = false;
 
       CREATE OR REPLACE TABLE CASE_DTL_STGN AS
@@ -102,6 +108,10 @@ cells:
               caseNumber,
               NTILE(12) OVER() - 1 AS PART
           FROM Q1
+    metadata: {}
+  - kind: 2
+    languageId: sql
+    value: ""
     metadata: {}
 metadata:
   conn:
