@@ -8,7 +8,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from threading import Lock
 import random
 import sys
-from proxy import proxy_list
+import os
 
 warnings.filterwarnings('ignore')
 
@@ -17,11 +17,11 @@ PARTITION = int(sys.argv[1])
 counter_lock = Lock()
 
 class Searcher:
-    
-    def __init__(self, cookie:str, size:int) -> None:
+    def __init__(self, cookie:str, proxies: list[str]) -> None:
         self.cookie = cookie
         self.session = self.create_session()
-        self.proxy = random.choice(proxy_list)
+        self.proxy_list = proxies
+        self.proxy = random.choice(self.proxy_list)
 
     def create_session(self):
         headers = {
@@ -46,13 +46,11 @@ class Searcher:
                 ).json()
                 with counter_lock:  # safe increment
                     global_counter -= 1
-                    left = global_counter
-                print(f'success. {left} remaining.')
+                print(f'success. {total_size - global_counter} requests executed...{global_counter} remaining.')
                 break
             except:
                 print(f'request failed for proxy: {self.proxy}')
-                self.proxy = random.choice(proxy_list)
-                print('new proxy: ', self.proxy)
+                self.proxy = random.choice(self.proxy_list)
         return res
     
     def write_json(self, res:dict):
@@ -99,9 +97,15 @@ def chunk_list(lst: list, n: int) -> list[list]:
     return [lst[i * k + min(i, m):(i + 1) * k + min(i + 1, m)] for i in range(n)]
 
 
-def run(payload_group:list[dict], cookie:str):
+def load_proxies() -> list:
+    with open('proxies.txt', 'r') as f:
+        proxies = f.read().split('\n')
+    return proxies
 
-    search = Searcher(cookie, size = len(payload_group))
+
+def run(payload_group:list[dict], cookie:str):
+    proxies = load_proxies()
+    search = Searcher(cookie, proxies)
     for x in payload_group:
         res = search.search(x)
         search.write_json(res)
@@ -110,9 +114,12 @@ def run(payload_group:list[dict], cookie:str):
 if __name__ == '__main__':
     threads = 8
     payload = query_payload()
-    global_counter = len(payload)
-    cookie = get_cookie()
     payload_groups = chunk_list(payload, threads)
+    cookie = get_cookie()
+
+    global_counter = len(payload)
+    total_size = len(payload)
+    
     with ThreadPoolExecutor(max_workers=threads) as executor:
         futures = [executor.submit(run, group, cookie) for group in payload_groups]
         for future in futures:

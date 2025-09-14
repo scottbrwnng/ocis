@@ -1,11 +1,13 @@
 cells:
   - kind: 2
     languageId: sql
-    value: SET preserve_insertion_order = false;
+    value: ""
     metadata: {}
   - kind: 2
     languageId: sql
     value: >-
+      SET preserve_insertion_order = false;
+
       CREATE OR REPLACE TABLE CASES_STGN AS 
 
       WITH Q1 AS (
@@ -34,6 +36,14 @@ cells:
       -- 397822: 3m 42s
 
       -- 520790: 4m 3s (while watching youtube)
+
+      -- 523442: 3m 23s
+
+      -- 896550: 14m
+
+      -- 1248157: 12m
+
+      SET preserve_insertion_order = false;
 
       CREATE OR REPLACE TABLE CASE_DTL_STGN AS
           SELECT
@@ -68,51 +78,30 @@ cells:
     metadata: {}
   - kind: 2
     languageId: sql
-    value: >-
+    value: |
       CREATE OR REPLACE VIEW V_TODO AS 
-
-      WITH Q1 AS (
-          SELECT
-              qualifiedFips,
-              courtLevel,
-              divisionType,
-              caseNumber
-          FROM CASES
-          EXCEPT
-          SELECT
-              qualifiedFips,
-              courtLevel,
-              divisionType,
-              caseNumber
-          FROM CASE_DTL
-      ),
-
-
-      Q2 AS (
+          WITH Q1 AS (
+              SELECT
+                  qualifiedFips,
+                  courtLevel,
+                  divisionType,
+                  caseNumber
+              FROM CASES
+              EXCEPT
+              SELECT
+                  qualifiedFips,
+                  courtLevel,
+                  divisionType,
+                  caseNumber
+              FROM CASE_DTL
+          )
           SELECT  
               qualifiedFips,
               courtLevel,
               divisionType,
               caseNumber,
-              ROW_NUMBER() OVER(ORDER BY qualifiedFips, courtLevel, divisionType, caseNumber) AS RN
+              NTILE(12) OVER() - 1 AS PART
           FROM Q1
-      )
-
-
-      SELECT
-          qualifiedFips,
-          courtLevel,
-          divisionType,
-          caseNumber,
-          RN,
-          CASE 
-              WHEN RN BETWEEN 0 AND 999_999 THEN 0
-              WHEN RN BETWEEN 1_000_000 AND 1_999_999 THEN 1
-              WHEN RN BETWEEN 2_000_000 AND 2_999_999 THEN 2
-              WHEN RN BETWEEN 3_000_000 AND 3_999_999 THEN 3
-              WHEN RN BETWEEN 4_000_000 AND 4_999_999 THEN 4
-              ELSE 5 END AS PART
-      FROM Q2
     metadata: {}
 metadata:
   conn:
