@@ -1,10 +1,6 @@
 cells:
   - kind: 2
     languageId: sql
-    value: ""
-    metadata: {}
-  - kind: 2
-    languageId: sql
     value: >-
       SET preserve_insertion_order = false;
 
@@ -49,6 +45,24 @@ cells:
 
       -- 1830937: 14m 14s
 
+      -- 2698229: 26m
+
+      -- 3125553: 30m
+
+      -- 3368096: 32m
+
+      -- 3482240: 36m
+
+      -- 3605705: 25m
+
+      -- 3777317: 28m
+
+      -- 3870933: 28m
+
+      -- 3968730: 32m 41s
+
+      -- 4054998: 40m 46s
+
       SET preserve_insertion_order = false;
 
       CREATE OR REPLACE TABLE CASE_DTL_STGN AS
@@ -84,7 +98,7 @@ cells:
     metadata: {}
   - kind: 2
     languageId: sql
-    value: |
+    value: >
       CREATE OR REPLACE VIEW V_TODO AS 
           WITH Q1 AS (
               SELECT
@@ -100,13 +114,20 @@ cells:
                   divisionType,
                   caseNumber
               FROM CASE_DTL
+              EXCEPT
+              SELECT 
+                  caseCourt.fipsCode || caseCourt.courtCategoryCode.value as qualifiedFips,
+                  caseCourt.courtCategoryCode.value as courtLevel,
+                  caseCategory.caseCategoryCode as divisionType,
+                  caseTrackingID as caseNumber
+              FROM CASE_DTL_TIM
           )
           SELECT  
               qualifiedFips,
               courtLevel,
               divisionType,
               caseNumber,
-              NTILE(12) OVER() - 1 AS PART
+              NTILE(4) OVER() - 1 AS PART
           FROM Q1
     metadata: {}
   - kind: 2

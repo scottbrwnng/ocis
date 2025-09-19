@@ -2,7 +2,6 @@ import requests
 import json
 import duckdb as ddb
 from datetime import date, timedelta
-import time
 import warnings
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from threading import Lock
