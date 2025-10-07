@@ -63,22 +63,51 @@ cells:
 
       -- 4054998: 40m 46s
 
+      -- 4257159: 42m 42s
+
+      -- 4648193: 69m 11s
+
+      -- 4812817: 3m 16s (switched to json.gz compression and queried all
+      columns)
+
       SET preserve_insertion_order = false;
 
       CREATE OR REPLACE TABLE CASE_DTL_STGN AS
-          SELECT
-              caseCourt.fipsCode || caseCourt.courtCategoryCode.value as qualifiedFips,
-              caseCourt.courtCategoryCode.value as courtLevel,
-              caseCategory.caseCategoryCode as divisionType,
-              caseTrackingID as caseNumber,
-              filename
-          FROM read_json('./dtl/*.json');
 
-      CREATE OR REPLACE TABLE CASE_DTL AS
-          SELECT DISTINCT
-              *
-          FROM CASE_DTL_STGN
-          ORDER BY qualifiedFips;
+      SELECT
+          *,
+          caseCourt.fipsCode || caseCourt.courtCategoryCode.value as qualifiedFips,
+          caseCourt.courtCategoryCode.value as courtLevel,
+          caseCategory.caseCategoryCode as divisionType,
+          caseTrackingID as caseNumber
+      FROM READ_JSON('./dtl_gz/dtl*.json.gz');
+    metadata: {}
+  - kind: 2
+    languageId: sql
+    value: |
+      CREATE OR REPLACE VIEW V_TODO AS 
+          WITH Q1 AS (
+              SELECT
+                  qualifiedFips,
+                  courtLevel,
+                  divisionType,
+                  caseNumber
+              FROM CASES
+              EXCEPT
+              SELECT
+                  qualifiedFips,
+                  courtLevel,
+                  divisionType,
+                  caseNumber
+              FROM CASE_DTL_STGN
+          )
+          SELECT  
+              qualifiedFips,
+              courtLevel,
+              divisionType,
+              caseNumber,
+              NTILE(4) OVER() - 1 AS PART
+          FROM Q1
     metadata: {}
   - kind: 2
     languageId: sql
@@ -95,44 +124,6 @@ cells:
       SELECT  
           unnest(context.entity.payload.allCourts, recursive :=True)
       from read_json('courtmapping.json')
-    metadata: {}
-  - kind: 2
-    languageId: sql
-    value: >
-      CREATE OR REPLACE VIEW V_TODO AS 
-          WITH Q1 AS (
-              SELECT
-                  qualifiedFips,
-                  courtLevel,
-                  divisionType,
-                  caseNumber
-              FROM CASES
-              EXCEPT
-              SELECT
-                  qualifiedFips,
-                  courtLevel,
-                  divisionType,
-                  caseNumber
-              FROM CASE_DTL
-              EXCEPT
-              SELECT 
-                  caseCourt.fipsCode || caseCourt.courtCategoryCode.value as qualifiedFips,
-                  caseCourt.courtCategoryCode.value as courtLevel,
-                  caseCategory.caseCategoryCode as divisionType,
-                  caseTrackingID as caseNumber
-              FROM CASE_DTL_TIM
-          )
-          SELECT  
-              qualifiedFips,
-              courtLevel,
-              divisionType,
-              caseNumber,
-              NTILE(4) OVER() - 1 AS PART
-          FROM Q1
-    metadata: {}
-  - kind: 2
-    languageId: sql
-    value: ""
     metadata: {}
 metadata:
   conn:

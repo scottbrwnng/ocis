@@ -1,13 +1,11 @@
 import requests
 import json
 import duckdb as ddb
-from datetime import date, timedelta
 import warnings
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor
 from threading import Lock
 import random
 import sys
-import os
 
 warnings.filterwarnings('ignore')
 
