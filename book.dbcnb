@@ -70,6 +70,8 @@ cells:
       -- 4812817: 3m 16s (switched to json.gz compression and queried all
       columns)
 
+      -- 4859420: 2m 49s
+
       SET preserve_insertion_order = false;
 
       CREATE OR REPLACE TABLE CASE_DTL_STGN AS
