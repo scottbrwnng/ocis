@@ -20,6 +20,7 @@ class Searcher:
         self.proxy_list = proxies
         self.proxy = random.choice(self.proxy_list)
 
+
     def create_session(self):
         headers = {
             "Accept": "application/json",
@@ -30,6 +31,7 @@ class Searcher:
         s.headers=headers
         return s
 
+
     def search(self, x:dict) -> dict: # NOTE: the combination of fips4 and casenumber, and division type should return 1 result
         global global_counter
         while True:                    # - case details required fields in payload are
@@ -38,10 +40,10 @@ class Searcher:
                     'https://eapps.courts.state.va.us/ocis-rest/api/public/getCaseDetails',
                     json = x,
                     verify=False,
-                    timeout = 5,
+                    timeout = 1,
                     proxies = {'http': self.proxy, 'https': self.proxy}
                 ).json()
-                with counter_lock:  # safe increment
+                with counter_lock: 
                     global_counter -= 1
                 print(f'success. {total_size - global_counter} requests executed...{global_counter} remaining.')
                 break
@@ -50,6 +52,7 @@ class Searcher:
                 self.proxy = random.choice(self.proxy_list)
         return res
     
+
     def write_json(self, res:dict):
         pay = res['context']['entity']['payload']
         case = pay['caseTrackingID']

@@ -72,6 +72,16 @@ cells:
 
       -- 4859420: 2m 49s
 
+      -- 4903055: 2m 30s
+
+      -- 4944833: 2m 4s
+
+      -- 5046242: 2m 18s
+
+      -- 5112862: 2m 32s
+
+      -- 5188587: 3m 3s
+
       SET preserve_insertion_order = false;
 
       CREATE OR REPLACE TABLE CASE_DTL_STGN AS
