@@ -13,7 +13,12 @@ cells:
           FROM read_json('./dumps/*.json')
       )
 
-      SELECT * FROM Q1;
+      SELECT 
+          *,
+          cast(
+              right(left(hearingDate, 10), 4) || '-' || left(hearingDate, 2) || '-' || right(left(hearingDate, 5), 2)
+          as date) as hearingDate_cast 
+      FROM Q1;
 
 
       CREATE OR REPLACE TABLE CASES AS
@@ -23,22 +28,6 @@ cells:
       FROM CASES_STGN
 
       ORDER BY qualifiedFips;
-    metadata: {}
-  - kind: 2
-    languageId: sql
-    value: >
-      WITH q1 AS (
-          SELECT 
-              CAST(STRPTIME(hearingDate, '%m/%d/%Y, %I:%M %p') AS DATE) AS DATE_PART
-          FROM CASES
-      )
-
-
-      SELECT
-          MAX(DATE_PART)
-      FROM q1
-
-      LIMIT 100
     metadata: {}
   - kind: 2
     languageId: sql
@@ -106,6 +95,10 @@ cells:
 
       -- 5235059: 2m 20s
 
+      -- 5280462: 2m 12s
+
+      -- 5436336: 2m 37s
+
       SET preserve_insertion_order = false;
 
       CREATE OR REPLACE TABLE CASE_DTL_STGN AS
@@ -163,10 +156,35 @@ cells:
     metadata: {}
   - kind: 2
     languageId: sql
+    value: >-
+      select 
+          hearingDate,
+          right(left(hearingDate, 10), 4) as year,
+          right(left(hearingDate, 5), 2) as day,
+          left(hearingDate, 2) as mon,
+          cast(
+              right(left(hearingDate, 10), 4) || '-' || left(hearingDate, 2) || '-' || right(left(hearingDate, 5), 2)
+          as date) as date
+      from cases 
+
+      order by date desc 
+
+      limit 100
+    metadata: {}
+  - kind: 2
+    languageId: sql
     value: |-
-      select * from cases 
-      where "qualifiedFips" = '061J'
-      and "caseNumber" = '0091310901'
+      select 
+          cast(right(left(hearingDate, 10), 4) as int) as year,
+          cast(left(hearingDate, 2) as int) as mon,
+          count(*)
+      from cases 
+      group by year, mon
+      order by year desc, mon desc
+    metadata: {}
+  - kind: 2
+    languageId: sql
+    value: ""
     metadata: {}
   - kind: 2
     languageId: sql
