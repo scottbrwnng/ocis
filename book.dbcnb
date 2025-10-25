@@ -168,6 +168,17 @@ cells:
       where "qualifiedFips" = '061J'
       and "caseNumber" = '0091310901'
     metadata: {}
+  - kind: 2
+    languageId: sql
+    value: |
+      select 
+          unnest(string_split(read_text('logs/app.log'), '\n'))
+      from read_text('./logs.log')
+    metadata: {}
+  - kind: 2
+    languageId: sql
+    value: ""
+    metadata: {}
 metadata:
   conn:
     id: 2aRkzf3RdWMovp6T1AKHw
