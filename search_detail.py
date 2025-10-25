@@ -121,7 +121,7 @@ def get_cookie():
             break
         except Exception as e:
             log.error(f'get cookie failed... {e}')
-    return cookie
+    return cookie 
     
 
 def chunk(lst: list, n: int) -> list[list]:
