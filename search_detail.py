@@ -6,24 +6,21 @@ from concurrent.futures import ThreadPoolExecutor
 from threading import Lock
 import random
 import sys
-
 import logging
+import time
+
 hs = logging.StreamHandler()
 hf = logging.FileHandler('logs.log')
 logging.basicConfig(
     level=logging.INFO, handlers=[hs, hf], 
     format='%(asctime)s [%(levelname)s] %(message)s', 
     datefmt='%Y-%m-%d %H:%M:%S')
-
 log = logging.getLogger(__name__)
-
 
 warnings.filterwarnings('ignore')
 
 PARTITION = int(sys.argv[1])
 
-
-counter_lock = Lock()
 
 class Searcher:
 
@@ -55,9 +52,11 @@ class Searcher:
                     'https://eapps.courts.state.va.us/ocis-rest/api/public/getCaseDetails',
                     json = pay,
                     verify=False,
-                    timeout=.5,
+                    timeout=1,
                     proxies = {'http': self.proxy} #, 'https': self.proxy}
                 )
+                ra = 1 / random.randint(50, 100)
+                time.sleep(ra)
                 return res
             except requests.ConnectionError as e:
                 log.error(f'{self.pay} ConnectionError for proxy: {self.proxy}, {e}')
@@ -83,18 +82,15 @@ class Searcher:
 
 
     def load(self, f_nm:str, res:dict) -> None:
-        global global_counter
+        global counter
         try:
             with open(f'./dtl/{f_nm}', 'x', encoding='utf-8') as f:
                 json.dump(res, f, indent=4)
-                with counter_lock: 
-                    global_counter -= 1
-                log.info(f'{self.pay} written successfully {total_size - global_counter} requests executed {global_counter} remaining.')
+            counter += 1
+            log.info(f'{self.pay} written successfully. {counter} requests executed {total_size - counter} remaining.')
         except FileExistsError:
-            with counter_lock: 
-                global_counter -= 1
-            log.error(f'{self.pay} already written, skipping write {total_size - global_counter} requests executed {global_counter} remaining.')
-
+            counter += 1
+            log.error(f'{self.pay} already written, skipping write. {counter} requests executed {total_size - counter} remaining.')
 
 
 def query_payload() -> list[dict]:
@@ -124,38 +120,23 @@ def get_cookie():
     return cookie 
     
 
-def chunk(lst: list, n: int) -> list[list]:
-    k, m = divmod(len(lst), n)
-    return [lst[i * k + min(i, m):(i + 1) * k + min(i + 1, m)] for i in range(n)]
-
-
 def load_proxies() -> list:
     with open('proxies.txt', 'r') as f:
         proxies = f.read().split('\n')
     return proxies
 
 
-def run(payload_group:list[dict], cookie:str):
+
+
+if __name__ == '__main__':
+    payload = query_payload()
+    cookie = get_cookie()
+    counter = 0
+    total_size = len(payload)
     proxies = load_proxies()
     search = Searcher(cookie, proxies)
-    for pay in payload_group:
+    for pay in payload:
         res = search.extract(pay)
         file_name, res_payload = search.transform(res)
         if file_name and res_payload:
             search.load(file_name, res_payload)
-
-
-
-if __name__ == '__main__':
-    threads = 8
-    payload = query_payload()
-    payload_groups = chunk(payload, threads)
-    cookie = get_cookie()
-
-    global_counter = len(payload)
-    total_size = len(payload)
-    
-    with ThreadPoolExecutor(max_workers=threads) as executor:
-        futures = [executor.submit(run, group, cookie) for group in payload_groups]
-        for future in futures:
-            future.result()
