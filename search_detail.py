@@ -12,7 +12,7 @@ hs = logging.StreamHandler()
 hf = logging.FileHandler('logs.log')
 logging.basicConfig(
     level=logging.INFO, handlers=[hs, hf], 
-    format='%(__name__)s %(asctime)s [%(levelname)s] %(message)s', 
+    format='%(asctime)s [%(levelname)s] %(message)s', 
     datefmt='%Y-%m-%d %H:%M:%S')
 
 log = logging.getLogger(__name__)
@@ -46,7 +46,7 @@ class Searcher:
         return s    
 
 
-    def extract(self, pay:dict) -> dict: # NOTE: the combination of fips4 and casenumber, and division type should return 1 result
+    def extract(self, pay:dict) -> requests.Response: # NOTE: the combination of fips4 and casenumber, and division type should return 1 result
         self.pay = pay
         while True:                    # - case details required fields in payload are
             try:                       # qualifiedFips, courtLevel, divisionType, caseNumber
@@ -55,32 +55,30 @@ class Searcher:
                     'https://eapps.courts.state.va.us/ocis-rest/api/public/getCaseDetails',
                     json = pay,
                     verify=False,
-                    timeout=1,
+                    timeout=.5,
                     proxies = {'http': self.proxy} #, 'https': self.proxy}
                 )
                 return res
-            except requests.exceptions.ConnectionError as e:
-                log.error(f'{self.pay} ConnectionError for proxy: {self.proxy}, \n {e}')
+            except requests.ConnectionError as e:
+                log.error(f'{self.pay} ConnectionError for proxy: {self.proxy}, {e}')
                 self.proxy = random.choice(self.proxy_list)
     
 
     def transform(self, res:dict) -> tuple[str, dict]:
         try:
-            res = res.json()
-            case = res['context']['entity']['payload']['caseTrackingID']
-            fips = res['context']['entity']['payload']['caseCourt']['fipsCode'] \
-                + res['context']['entity']['payload']['caseCourt']['courtCategoryCode']['value']
-            div = res['context']['entity']['payload']['caseCategory']['caseCategoryCode']
+            res_pay = res.json()['context']['entity']['payload']
+            case = res_pay['caseTrackingID']
+            fips = res_pay['caseCourt']['fipsCode'] + res_pay['caseCourt']['courtCategoryCode']['value']
+            div = res_pay['caseCategory']['caseCategoryCode']
             file_name = f'{fips}_{case}_{div}.json'
-            res_payload = res['context']['entity']['payload']
-            return file_name, res_payload
+            return file_name, res_pay
         except KeyError as e:
-            log.error(f'{self.pay} Key error: {e} does not exist in response. res: \n {res} \n {res.content}')
-        except requests.exceptions.JSONDecodeError as e:
+            log.error(f'{self.pay} Key error: {e} does not exist in response. res: {res} res.content: {res.content}')
+        except requests.JSONDecodeError as e:
             if 'rate limit' in str(res.content):
                 log.error(f'{self.pay} Failed to decode json response likely due to rate limiting....')
             else:
-                log.error(f'{self.pay} Failed to decode json response \n res: {res.content}')
+                log.error(f'{self.pay} Failed to decode json response res: {res.content}')
         return False, False
 
 
@@ -91,11 +89,11 @@ class Searcher:
                 json.dump(res, f, indent=4)
                 with counter_lock: 
                     global_counter -= 1
-                log.info(f'{self.pay} written successfully \n {total_size - global_counter} requests executed {global_counter} remaining.')
+                log.info(f'{self.pay} written successfully {total_size - global_counter} requests executed {global_counter} remaining.')
         except FileExistsError:
             with counter_lock: 
                 global_counter -= 1
-            log.error(f'{self.pay} already written, skipping write \n {total_size - global_counter} requests executed {global_counter} remaining.')
+            log.error(f'{self.pay} already written, skipping write {total_size - global_counter} requests executed {global_counter} remaining.')
 
 
 
@@ -142,9 +140,9 @@ def run(payload_group:list[dict], cookie:str):
     search = Searcher(cookie, proxies)
     for pay in payload_group:
         res = search.extract(pay)
-        f_nm, res_payload = search.transform(res)
-        if f_nm and res_payload:
-            search.load(f_nm, res_payload)
+        file_name, res_payload = search.transform(res)
+        if file_name and res_payload:
+            search.load(file_name, res_payload)
 
 
 
