@@ -7,9 +7,21 @@ from threading import Lock
 import random
 import sys
 
+import logging
+hs = logging.StreamHandler()
+hf = logging.FileHandler('logs.log')
+logging.basicConfig(
+    level=logging.INFO, handlers=[hs, hf], 
+    format='%(asctime)s [%(levelname)s] %(message)s', 
+    datefmt='%Y-%m-%d %H:%M:%S')
+
+log = logging.getLogger(__name__)
+
+
 warnings.filterwarnings('ignore')
 
 PARTITION = int(sys.argv[1])
+
 
 counter_lock = Lock()
 
@@ -20,7 +32,6 @@ class Searcher:
         self.proxy_list = proxies
         self.proxy = random.choice(self.proxy_list)
 
-
     def create_session(self):
         headers = {
             "Accept": "application/json",
@@ -29,40 +40,48 @@ class Searcher:
         }
         s = requests.Session()
         s.headers=headers
-        return s
+        return s    
 
-
-    def search(self, x:dict) -> dict: # NOTE: the combination of fips4 and casenumber, and division type should return 1 result
-        global global_counter
+    def search(self, pay:dict) -> dict: # NOTE: the combination of fips4 and casenumber, and division type should return 1 result
         while True:                    # - case details required fields in payload are
             try:                       # qualifiedFips, courtLevel, divisionType, caseNumber
+                log.info(f'requesting {pay}')
                 res = self.session.post(
                     'https://eapps.courts.state.va.us/ocis-rest/api/public/getCaseDetails',
-                    json = x,
+                    json = pay,
                     verify=False,
-                    timeout = 1,
-                    proxies = {'http': self.proxy, 'https': self.proxy}
-                ).json()
-                with counter_lock: 
-                    global_counter -= 1
-                print(f'success. {total_size - global_counter} requests executed...{global_counter} remaining.')
-                break
-            except:
-                print(f'request failed for proxy: {self.proxy}')
+                    timeout=1,
+                    proxies = {'http': self.proxy} #, 'https': self.proxy}
+                )
+                res_json = res.json()
+                return res_json
+            except requests.exceptions.ConnectionError as e:
+                log.error(f'ConnectionError for proxy: {self.proxy}, -----  e: {e}, ----- payload: {pay}')
                 self.proxy = random.choice(self.proxy_list)
-        return res
-    
-
+            except requests.exceptions.JSONDecodeError as e:
+                if 'rate limit' in str(res.content):
+                    log.error(f'failed to decode json response likely due to rate limiting.... {pay}')
+                else:
+                    log.error(f'failed to decode json response for {pay}... \n res: {res.content}')
+        
     def write_json(self, res:dict):
-        pay = res['context']['entity']['payload']
-        case = pay['caseTrackingID']
-        fips = pay['caseCourt']['fipsCode'] + pay['caseCourt']['courtCategoryCode']['value']
-        div = pay['caseCategory']['caseCategoryCode']
+        global global_counter
         try:
+            pay = res['context']['entity']['payload']
+            case = pay['caseTrackingID']
+            fips = pay['caseCourt']['fipsCode'] + pay['caseCourt']['courtCategoryCode']['value']
+            div = pay['caseCategory']['caseCategoryCode']
             with open(f'./dtl/{fips}_{case}_{div}.json', 'x', encoding='utf-8') as f:
                 json.dump(pay, f, indent=4)
+                with counter_lock: 
+                    global_counter -= 1
+                log.info(f'{fips}_{case}_{div}.json written successfully.... {total_size - global_counter} requests executed...{global_counter} remaining.')
         except FileExistsError:
-            print('File already exists, skipping write.')
+            with counter_lock: 
+                global_counter -= 1
+            log.error(f'{fips}_{case}_{div}.json already exists, skipping write....{global_counter} remaining')
+        except KeyError as e:
+            log.error(f'Key error: {e} does not exist in payload. res: \n \t\t\t {res}')
 
 
 def query_payload() -> list[dict]:
@@ -87,10 +106,10 @@ def get_cookie():
             res = requests.get(url, verify=False)
             cookie = res.cookies['OES_TC_JSESSIONID']
             break
-        except:
-            print('get cookie failed')
+        except Exception as e:
+            log.error(f'get cookie failed... {e}')
     return cookie
-
+    
 
 def chunk(lst: list, n: int) -> list[list]:
     k, m = divmod(len(lst), n)
@@ -106,9 +125,10 @@ def load_proxies() -> list:
 def run(payload_group:list[dict], cookie:str):
     proxies = load_proxies()
     search = Searcher(cookie, proxies)
-    for x in payload_group:
-        res = search.search(x)
+    for pay in payload_group:
+        res = search.search(pay)
         search.write_json(res)
+
 
 
 if __name__ == '__main__':

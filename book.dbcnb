@@ -26,12 +26,28 @@ cells:
     metadata: {}
   - kind: 2
     languageId: sql
+    value: >
+      WITH q1 AS (
+          SELECT 
+              CAST(STRPTIME(hearingDate, '%m/%d/%Y, %I:%M %p') AS DATE) AS DATE_PART
+          FROM CASES
+      )
+
+
+      SELECT
+          MAX(DATE_PART)
+      FROM q1
+
+      LIMIT 100
+    metadata: {}
+  - kind: 2
+    languageId: sql
     value: >-
       -- <375000: 3m 40s
 
       -- 397822: 3m 42s
 
-      -- 520790: 4m 3s (while watching youtube)
+      -- 520790: 4m 3s 
 
       -- 523442: 3m 23s
 
@@ -81,6 +97,12 @@ cells:
       -- 5112862: 2m 32s
 
       -- 5188587: 3m 3s
+
+      -- 5199586: 2m 43s
+
+      -- 5210585: 2m 8s
+
+      -- 5221941: 2m 1s
 
       SET preserve_insertion_order = false;
 
@@ -136,6 +158,13 @@ cells:
       SELECT  
           unnest(context.entity.payload.allCourts, recursive :=True)
       from read_json('courtmapping.json')
+    metadata: {}
+  - kind: 2
+    languageId: sql
+    value: |-
+      select * from cases 
+      where "qualifiedFips" = '061J'
+      and "caseNumber" = '0091310901'
     metadata: {}
 metadata:
   conn:
