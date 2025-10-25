@@ -2,8 +2,6 @@ import requests
 import json
 import duckdb as ddb
 import warnings
-from concurrent.futures import ThreadPoolExecutor
-from threading import Lock
 import random
 import sys
 import logging
