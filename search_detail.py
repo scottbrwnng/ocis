@@ -12,7 +12,7 @@ hs = logging.StreamHandler()
 hf = logging.FileHandler('logs.log')
 logging.basicConfig(
     level=logging.INFO, handlers=[hs, hf], 
-    format='%(asctime)s [%(levelname)s] %(message)s', 
+    format='%(__name__)s %(asctime)s [%(levelname)s] %(message)s', 
     datefmt='%Y-%m-%d %H:%M:%S')
 
 log = logging.getLogger(__name__)
@@ -26,11 +26,14 @@ PARTITION = int(sys.argv[1])
 counter_lock = Lock()
 
 class Searcher:
+
     def __init__(self, cookie:str, proxies: list[str]) -> None:
         self.cookie = cookie
         self.session = self.create_session()
         self.proxy_list = proxies
         self.proxy = random.choice(self.proxy_list)
+        self.pay = None
+
 
     def create_session(self):
         headers = {
@@ -42,10 +45,12 @@ class Searcher:
         s.headers=headers
         return s    
 
-    def search(self, pay:dict) -> dict: # NOTE: the combination of fips4 and casenumber, and division type should return 1 result
+
+    def extract(self, pay:dict) -> dict: # NOTE: the combination of fips4 and casenumber, and division type should return 1 result
+        self.pay = pay
         while True:                    # - case details required fields in payload are
             try:                       # qualifiedFips, courtLevel, divisionType, caseNumber
-                log.info(f'requesting {pay}')
+                log.info(f'{self.pay} requesting.....')
                 res = self.session.post(
                     'https://eapps.courts.state.va.us/ocis-rest/api/public/getCaseDetails',
                     json = pay,
@@ -53,35 +58,45 @@ class Searcher:
                     timeout=1,
                     proxies = {'http': self.proxy} #, 'https': self.proxy}
                 )
-                res_json = res.json()
-                return res_json
+                return res
             except requests.exceptions.ConnectionError as e:
-                log.error(f'ConnectionError for proxy: {self.proxy}, -----  e: {e}, ----- payload: {pay}')
+                log.error(f'{self.pay} ConnectionError for proxy: {self.proxy}, \n {e}')
                 self.proxy = random.choice(self.proxy_list)
-            except requests.exceptions.JSONDecodeError as e:
-                if 'rate limit' in str(res.content):
-                    log.error(f'failed to decode json response likely due to rate limiting.... {pay}')
-                else:
-                    log.error(f'failed to decode json response for {pay}... \n res: {res.content}')
-        
-    def write_json(self, res:dict):
+    
+
+    def transform(self, res:dict) -> tuple[str, dict]:
+        try:
+            res = res.json()
+            case = res['context']['entity']['payload']['caseTrackingID']
+            fips = res['context']['entity']['payload']['caseCourt']['fipsCode'] \
+                + res['context']['entity']['payload']['caseCourt']['courtCategoryCode']['value']
+            div = res['context']['entity']['payload']['caseCategory']['caseCategoryCode']
+            file_name = f'{fips}_{case}_{div}.json'
+            res_payload = res['context']['entity']['payload']
+            return file_name, res_payload
+        except KeyError as e:
+            log.error(f'{self.pay} Key error: {e} does not exist in response. res: \n {res} \n {res.content}')
+        except requests.exceptions.JSONDecodeError as e:
+            if 'rate limit' in str(res.content):
+                log.error(f'{self.pay} Failed to decode json response likely due to rate limiting....')
+            else:
+                log.error(f'{self.pay} Failed to decode json response \n res: {res.content}')
+        return False, False
+
+
+    def load(self, f_nm:str, res:dict) -> None:
         global global_counter
         try:
-            pay = res['context']['entity']['payload']
-            case = pay['caseTrackingID']
-            fips = pay['caseCourt']['fipsCode'] + pay['caseCourt']['courtCategoryCode']['value']
-            div = pay['caseCategory']['caseCategoryCode']
-            with open(f'./dtl/{fips}_{case}_{div}.json', 'x', encoding='utf-8') as f:
-                json.dump(pay, f, indent=4)
+            with open(f'./dtl/{f_nm}', 'x', encoding='utf-8') as f:
+                json.dump(res, f, indent=4)
                 with counter_lock: 
                     global_counter -= 1
-                log.info(f'{fips}_{case}_{div}.json written successfully.... {total_size - global_counter} requests executed...{global_counter} remaining.')
+                log.info(f'{self.pay} written successfully \n {total_size - global_counter} requests executed {global_counter} remaining.')
         except FileExistsError:
             with counter_lock: 
                 global_counter -= 1
-            log.error(f'{fips}_{case}_{div}.json already exists, skipping write....{global_counter} remaining')
-        except KeyError as e:
-            log.error(f'Key error: {e} does not exist in payload. res: \n \t\t\t {res}')
+            log.error(f'{self.pay} already written, skipping write \n {total_size - global_counter} requests executed {global_counter} remaining.')
+
 
 
 def query_payload() -> list[dict]:
@@ -126,8 +141,10 @@ def run(payload_group:list[dict], cookie:str):
     proxies = load_proxies()
     search = Searcher(cookie, proxies)
     for pay in payload_group:
-        res = search.search(pay)
-        search.write_json(res)
+        res = search.extract(pay)
+        f_nm, res_payload = search.transform(res)
+        if f_nm and res_payload:
+            search.load(f_nm, res_payload)
 
 
 
