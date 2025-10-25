@@ -50,15 +50,20 @@ class Searcher:
                     'https://eapps.courts.state.va.us/ocis-rest/api/public/getCaseDetails',
                     json = pay,
                     verify=False,
-                    timeout=2,
+                    timeout=1,
                     proxies = {'http': self.proxy} #, 'https': self.proxy}
                 )
-                ra = 1 / random.randint(50, 100)
-                time.sleep(ra)
                 return res
             except requests.ConnectionError as e:
                 log.error(f'{self.pay} ConnectionError for proxy: {self.proxy}, {e}')
                 self.proxy = random.choice(self.proxy_list)
+                ra = 1 / random.randint(50, 100)
+                time.sleep(ra)
+            except requests.ReadTimeout as e:
+                log.error(f'{self.pay} ReadTimeout for proxy: {self.proxy}, {e}')
+                self.proxy = random.choice(self.proxy_list)
+                ra = 1 / random.randint(50, 100)
+                time.sleep(ra)
     
 
     def transform(self, res:dict) -> tuple[str, dict]:
