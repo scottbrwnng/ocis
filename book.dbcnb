@@ -197,10 +197,6 @@ cells:
           string_split(unnest(string_split(content, 'xxx --')), '{', include=true)
       from read_text('./logs.log')
     metadata: {}
-  - kind: 2
-    languageId: sql
-    value: ""
-    metadata: {}
 metadata:
   conn:
     id: 2aRkzf3RdWMovp6T1AKHw

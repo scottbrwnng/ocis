@@ -40,7 +40,7 @@ class Searcher:
         self.idx = None
         self.out = []
 
-    def search(self) -> dict:
+    def extract(self) -> dict:
         _date = self._date.strftime('%m/%d/%Y')
         payload = {"courtLevels":[],"divisions":["Adult Criminal/Traffic"],"selectedCourts":[],"searchString":[_date],"searchBy":"HD"}
         if self.idx: # may not need if statement
@@ -54,11 +54,11 @@ class Searcher:
         return res
         
     def last_result_index(self, res:dict=None) -> None:
-        try:
-            self.idx = res['context']['entity']['payload']['lastResponseIndex']
-        except:
+        if res.get('context').get('entitiy').get('payload').get('lastResponseIndex'):
+            self.idx = res.get('context').get('entitiy').get('payload').get('lastResponseIndex')
+        else:
             self.idx = None
-
+            
     def increase_date(self) -> None: 
         self._date += timedelta(days=1)
 
@@ -71,7 +71,7 @@ def run(single_date:date):
     print('running', single_date)
     search = Searcher(single_date)
     while True:
-        res = search.search()
+        res = search.extract()
         search.write_json(res)
         search.last_result_index(res)
         if not search.idx:
@@ -81,7 +81,7 @@ def run(single_date:date):
 def main():
     start_date = date(year = 1980, month = 1, day = 1)
     end_date = date.today()
-    dates = date_range(start_date, end_date)
+    dates = date_range(start_date, end_date)[10:]
     # threads are fine for network I/O and avoid pickling problems
     with ThreadPoolExecutor(max_workers=8) as executor:
         futures = {executor.submit(run, d): d for d in dates}
