@@ -17,19 +17,18 @@ logging.basicConfig(
 
 log = logging.getLogger(__name__)
 
-
 warnings.filterwarnings('ignore')
 
 PARTITION = int(sys.argv[1])
 
-
 counter_lock = Lock()
+
 
 class Searcher:
 
-    def __init__(self, proxies: list[str]) -> None:
+    def __init__(self) -> None:
         self.session = self.create_session()
-        self.proxy_list = proxies
+        self.proxy_list = load_proxies()
         self.proxy = random.choice(self.proxy_list)
         self.pay = None
 
@@ -60,7 +59,8 @@ class Searcher:
 
     def extract(self, pay:dict) -> requests.Response: # NOTE: the combination of fips4 and casenumber, and division type should return 1 result
         self.pay = pay
-        while True:                    # - case details required fields in payload are
+        retries = 3
+        while retries > 0:                    # - case details required fields in payload are
             try:                       # qualifiedFips, courtLevel, divisionType, caseNumber
                 log.info(f'{self.pay} requesting.....')
                 res = self.session.post(
@@ -70,28 +70,26 @@ class Searcher:
                     timeout=2,
                     proxies = {'http': self.proxy} #, 'https': self.proxy}
                 )
+                res = res.json()['context']['entity']['payload']
                 return res
-            except requests.ConnectionError as e:
-                log.error(f'{self.pay} ConnectionError for proxy: {self.proxy}, {e}')
+            except Exception as e:
+                log.error(f'{self.pay} Exception: {e}... {res.content}')
                 self.proxy = random.choice(self.proxy_list)
+                self.session = self.create_session()
+                # ra = 1 / random.randint(50, 100)
+                # time.sleep(ra)
+                retries-=1
     
 
     def transform(self, res:dict) -> tuple[str, dict]:
         try:
-            res_pay = res.json()['context']['entity']['payload']
-            case = res_pay['caseTrackingID']
-            fips = res_pay['caseCourt']['fipsCode'] + res_pay['caseCourt']['courtCategoryCode']['value']
-            div = res_pay['caseCategory']['caseCategoryCode']
+            case = res['caseTrackingID']
+            fips = res['caseCourt']['fipsCode'] + res['caseCourt']['courtCategoryCode']['value']
+            div = res['caseCategory']['caseCategoryCode']
             file_name = f'{fips}_{case}_{div}.json'
-            return file_name, res_pay
-        except KeyError as e:
-            log.error(f'{self.pay} Key error: {e} does not exist in response. res: {res} res.content: {res.content}')
-        except requests.JSONDecodeError as e:
-            if 'rate limit' in str(res.content):
-                log.error(f'{self.pay} Failed to decode json response likely due to rate limiting....')
-            else:
-                log.error(f'{self.pay} Failed to decode json response res: {res.content}')
-        return False, False
+            return file_name, res
+        except Exception as e:
+            log.error(f'{self.pay} Exception: {e}... {res}')
 
 
     def load(self, f_nm:str, res:dict) -> None:
@@ -123,8 +121,6 @@ def query_payload() -> list[dict]:
         res = conn.execute(sql, [PARTITION]).fetchall()
         return [{'qualifiedFips': r[0], 'courtLevel': r[1], 'divisionType': r[2], 'caseNumber': r[3]} for r in res]
 
-
-
     
 
 def chunk(lst: list, n: int) -> list[list]:
@@ -139,9 +135,7 @@ def load_proxies() -> list:
 
 
 def run(payload_group:list[dict]):
-    proxies = load_proxies()
-    cookie = get_cookie()
-    search = Searcher(cookie, proxies)
+    search = Searcher()
     for pay in payload_group:
         res = search.extract(pay)
         file_name, res_payload = search.transform(res)
