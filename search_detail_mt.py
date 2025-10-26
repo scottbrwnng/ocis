@@ -6,13 +6,14 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from threading import Lock
 import random
 import sys
+import time
 
 import logging
 hs = logging.StreamHandler()
 hf = logging.FileHandler('logs.log')
 logging.basicConfig(
     level=logging.INFO, handlers=[hs, hf], 
-    format='%(asctime)s [%(levelname)s] %(message)s', 
+    format='%(asctime)s [%(levelname)s] [%(threadName)s] %(message)s', 
     datefmt='%Y-%m-%d %H:%M:%S')
 
 log = logging.getLogger(__name__)
@@ -59,10 +60,10 @@ class Searcher:
 
     def extract(self, pay:dict) -> dict|None: # NOTE: the combination of fips4 and casenumber, and division type should return 1 result
         self.pay = pay
-        retries = 3
-        while retries > 0:                    # - case details required fields in payload are
+        retries = 0
+        while retries < 5:             # - case details required fields in payload are
             try:                       # qualifiedFips, courtLevel, divisionType, caseNumber
-                log.info(f'{self.pay} requesting.....')
+                log.info(f'{self.pay} requesting, retries: {retries}')
                 res = self.session.post(
                     'https://eapps.courts.state.va.us/ocis-rest/api/public/getCaseDetails',
                     json = pay,
@@ -74,11 +75,13 @@ class Searcher:
                 return res
             except Exception as e:
                 log.error(f'{self.pay} {type(e).__name__}: {e}')
-                self.proxy = random.choice(self.proxy_list)
-                self.session = self.create_session()
-                # ra = 1 / random.randint(50, 100)
-                # time.sleep(ra)
-                retries-=1
+                if retries > 1:
+                    time.sleep(1 / random.randint(5, 10))
+                if retries > 2:
+                    self.proxy = random.choice(self.proxy_list)
+                if retries > 3:
+                    self.session = self.create_session()
+                retries+=1
     
 
     def transform(self, res:dict) -> tuple[str,dict]|None:
