@@ -2,6 +2,8 @@ cells:
   - kind: 2
     languageId: sql
     value: >-
+      -- 9822217: 9m 18s
+
       SET preserve_insertion_order = false;
 
       CREATE OR REPLACE TABLE CASES_STGN AS 

@@ -27,8 +27,7 @@ counter_lock = Lock()
 
 class Searcher:
 
-    def __init__(self, cookie:str, proxies: list[str]) -> None:
-        self.cookie = cookie
+    def __init__(self, proxies: list[str]) -> None:
         self.session = self.create_session()
         self.proxy_list = proxies
         self.proxy = random.choice(self.proxy_list)
@@ -36,10 +35,23 @@ class Searcher:
 
 
     def create_session(self):
+
+        def get_cookie() -> str:
+            while True:
+                try:
+                    url = "https://eapps.courts.state.va.us/ocis-rest/api/public/termsAndCondAccepted"
+                    res = requests.get(url, verify=False)
+                    cookie = res.cookies['OES_TC_JSESSIONID']
+                    break
+                except Exception as e:
+                    log.error(f'get cookie failed... {e}')
+            return cookie
+
+        cookie = get_cookie()
         headers = {
             "Accept": "application/json",
             "Content-Type": "application/json;charset=UTF-8",
-            'Cookie': f'OES_TC_JSESSIONID={self.cookie}'
+            'Cookie': f'OES_TC_JSESSIONID={cookie}'
         }
         s = requests.Session()
         s.headers=headers
@@ -112,16 +124,7 @@ def query_payload() -> list[dict]:
         return [{'qualifiedFips': r[0], 'courtLevel': r[1], 'divisionType': r[2], 'caseNumber': r[3]} for r in res]
 
 
-def get_cookie():
-    while True:
-        try:
-            url = "https://eapps.courts.state.va.us/ocis-rest/api/public/termsAndCondAccepted"
-            res = requests.get(url, verify=False)
-            cookie = res.cookies['OES_TC_JSESSIONID']
-            break
-        except Exception as e:
-            log.error(f'get cookie failed... {e}')
-    return cookie
+
     
 
 def chunk(lst: list, n: int) -> list[list]:
@@ -135,8 +138,9 @@ def load_proxies() -> list:
     return proxies
 
 
-def run(payload_group:list[dict], cookie:str):
+def run(payload_group:list[dict]):
     proxies = load_proxies()
+    cookie = get_cookie()
     search = Searcher(cookie, proxies)
     for pay in payload_group:
         res = search.extract(pay)
@@ -150,12 +154,11 @@ if __name__ == '__main__':
     threads = 8
     payload = query_payload()
     payload_groups = chunk(payload, threads)
-    cookie = get_cookie()
 
     global_counter = len(payload)
     total_size = len(payload)
     
     with ThreadPoolExecutor(max_workers=threads) as executor:
-        futures = [executor.submit(run, group, cookie) for group in payload_groups]
+        futures = [executor.submit(run, group) for group in payload_groups]
         for future in futures:
             future.result()

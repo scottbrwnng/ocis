@@ -50,7 +50,7 @@ class Searcher:
                     'https://eapps.courts.state.va.us/ocis-rest/api/public/getCaseDetails',
                     json = pay,
                     verify=False,
-                    timeout=1,
+                    timeout=2,
                     proxies = {'http': self.proxy} #, 'https': self.proxy}
                 )
                 return res
