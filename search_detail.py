@@ -39,7 +39,7 @@ class Searcher:
                     cookie = res.cookies['OES_TC_JSESSIONID']
                     break
                 except Exception as e:
-                    log.error(f'get cookie failed... {e}')
+                    log.error(f'{self.pay} {type(e).__name__}: {e}')
             return cookie
 
         cookie = get_cookie()
@@ -53,7 +53,7 @@ class Searcher:
         return s 
 
 
-    def extract(self, pay:dict) -> requests.Response: # NOTE: the combination of fips4 and casenumber, and division type should return 1 result
+    def extract(self, pay:dict) -> dict | None: # NOTE: the combination of fips4 and casenumber, and division type should return 1 result
         self.pay = pay
         retries = 3
         while retries > 0:                    # - case details required fields in payload are
@@ -77,7 +77,7 @@ class Searcher:
                 retries-=1
 
 
-    def transform(self, res:dict) -> tuple[str, dict]:
+    def transform(self, res:dict) -> tuple[str,dict]|None:
         try:
             case = res['caseTrackingID']
             fips = res['caseCourt']['fipsCode'] + res['caseCourt']['courtCategoryCode']['value']
@@ -85,7 +85,7 @@ class Searcher:
             file_name = f'{fips}_{case}_{div}.json'
             return file_name, res
         except Exception as e:
-            log.error(f'{self.pay} Exception: {e}... {res}')
+            log.error(f'{self.pay} {type(e).__name__}: {e}')
 
 
     def load(self, f_nm:str, res:dict) -> None:
@@ -134,4 +134,5 @@ if __name__ == '__main__':
         if not res:
             continue
         file_name, res = search.transform(res)
-        search.load(file_name, res)
+        if file_name and res:
+            search.load(file_name, res)

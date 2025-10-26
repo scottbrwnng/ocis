@@ -2,7 +2,7 @@ import requests
 import json
 import duckdb as ddb
 import warnings
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from threading import Lock
 import random
 import sys
@@ -43,7 +43,7 @@ class Searcher:
                     cookie = res.cookies['OES_TC_JSESSIONID']
                     break
                 except Exception as e:
-                    log.error(f'get cookie failed... {e}')
+                    log.error(f'{self.pay} {type(e).__name__}: {e}')
             return cookie
 
         cookie = get_cookie()
@@ -57,7 +57,7 @@ class Searcher:
         return s    
 
 
-    def extract(self, pay:dict) -> requests.Response: # NOTE: the combination of fips4 and casenumber, and division type should return 1 result
+    def extract(self, pay:dict) -> dict|None: # NOTE: the combination of fips4 and casenumber, and division type should return 1 result
         self.pay = pay
         retries = 3
         while retries > 0:                    # - case details required fields in payload are
@@ -67,13 +67,13 @@ class Searcher:
                     'https://eapps.courts.state.va.us/ocis-rest/api/public/getCaseDetails',
                     json = pay,
                     verify=False,
-                    timeout=2,
+                    timeout=1,
                     proxies = {'http': self.proxy} #, 'https': self.proxy}
                 )
                 res = res.json()['context']['entity']['payload']
                 return res
             except Exception as e:
-                log.error(f'{self.pay} Exception: {e}... {res.content}')
+                log.error(f'{self.pay} {type(e).__name__}: {e}')
                 self.proxy = random.choice(self.proxy_list)
                 self.session = self.create_session()
                 # ra = 1 / random.randint(50, 100)
@@ -81,7 +81,7 @@ class Searcher:
                 retries-=1
     
 
-    def transform(self, res:dict) -> tuple[str, dict]:
+    def transform(self, res:dict) -> tuple[str,dict]|None:
         try:
             case = res['caseTrackingID']
             fips = res['caseCourt']['fipsCode'] + res['caseCourt']['courtCategoryCode']['value']
@@ -89,7 +89,7 @@ class Searcher:
             file_name = f'{fips}_{case}_{div}.json'
             return file_name, res
         except Exception as e:
-            log.error(f'{self.pay} Exception: {e}... {res}')
+            log.error(f'{self.pay} {type(e).__name__}: {e}')
 
 
     def load(self, f_nm:str, res:dict) -> None:
@@ -138,9 +138,11 @@ def run(payload_group:list[dict]):
     search = Searcher()
     for pay in payload_group:
         res = search.extract(pay)
-        file_name, res_payload = search.transform(res)
-        if file_name and res_payload:
-            search.load(file_name, res_payload)
+        if not res:
+            continue
+        file_name, res = search.transform(res)
+        if file_name and res:
+            search.load(file_name, res)
 
 
 
@@ -154,5 +156,5 @@ if __name__ == '__main__':
     
     with ThreadPoolExecutor(max_workers=threads) as executor:
         futures = [executor.submit(run, group) for group in payload_groups]
-        for future in futures:
+        for future in as_completed(futures):
             future.result()
