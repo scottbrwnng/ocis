@@ -75,11 +75,12 @@ class Searcher:
                 return res
             except Exception as e:
                 log.error(f'{self.pay} {type(e).__name__}: {e}')
-                if retries > 1:
+                time.sleep(1 / random.randint(5, 10))
+                if retries > 0:
                     time.sleep(1 / random.randint(5, 10))
-                if retries > 2:
+                if retries > 1:
                     self.proxy = random.choice(self.proxy_list)
-                if retries > 3:
+                if retries > 2:
                     self.session = self.create_session()
                 retries+=1
     

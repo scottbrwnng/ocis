@@ -17,7 +17,7 @@ def table_size() -> int:
     return size
 
 
-def comprx():
+def compress():
     all_files = os.listdir('./dtl/')
     size = table_size() + 1
     out = []
@@ -40,5 +40,34 @@ def comprx():
         json.dump(out, f)
     print('creating', path)
 
+
+def load_table():
+    sql = '''
+        SET preserve_insertion_order = false;
+        CREATE OR REPLACE TABLE CASE_DTL_STGN AS
+        SELECT
+            *,
+            caseCourt.fipsCode || caseCourt.courtCategoryCode.value as qualifiedFips,
+            caseCourt.courtCategoryCode.value as courtLevel,
+            caseCategory.caseCategoryCode as divisionType,
+            caseTrackingID as caseNumber
+        FROM READ_JSON('./dtl_gz/dtl*.json.gz');
+    '''
+    print('loading table...')
+    with ddb.connect('ocis') as conn:
+        conn.execute(sql)
+
+
+def reset_dir():
+    if os.path.exists('./tes'):
+        os.rmdir('./tes')
+    if not os.path.exists('./tes'):
+        os.mkdir('./tes')
+    
+
+
+
 if __name__ == '__main__':
-    comprx()
+    compress()
+    load_table()
+    reset_dir()
