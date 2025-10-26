@@ -192,10 +192,48 @@ cells:
     metadata: {}
   - kind: 2
     languageId: sql
-    value: >
-      select 
-          string_split(unnest(string_split(content, 'xxx --')), '{', include=true)
-      from read_text('./logs.log')
+    value: |-
+      select * from CASE_DTL_STGN
+      limit 1000
+    metadata: {}
+  - kind: 2
+    languageId: sql
+    value: |-
+      with q1 as (
+          select distinct 
+          qualifiedFips,
+          courtLevel,
+          divisionType,
+          caseNumber
+      from case_dtl_stgn
+      )
+      select count(*) from q1
+    metadata: {}
+  - kind: 2
+    languageId: sql
+    value: |-
+      with q1 as (
+          select distinct 
+          qualifiedFips,
+          courtLevel,
+          divisionType,
+          caseNumber
+      from cases
+      )
+      select count(*) from q1
+    metadata: {}
+  - kind: 2
+    languageId: sql
+    value: |-
+      select
+          STRFTIME(offenseDate)
+          offenseDate
+      from cases
+      limit 100
+    metadata: {}
+  - kind: 2
+    languageId: sql
+    value: ""
     metadata: {}
 metadata:
   conn:

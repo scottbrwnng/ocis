@@ -52,13 +52,16 @@ def load_table():
     print('loading table...')
     with ddb.connect('ocis') as conn:
         conn.execute(sql)
+    print('table created')
 
 
 def reset_dir():
     if os.path.exists('./case_details'):
         shutil.rmtree('./case_details')
+        print('./case_details deleted')
     if not os.path.exists('./case_details'):
         os.mkdir('./case_details')
+        print('./case_details created')
     
 
 

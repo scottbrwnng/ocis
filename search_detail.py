@@ -15,12 +15,11 @@ logging.basicConfig(
     level=logging.INFO, handlers=[hs, hf], 
     format='xxx -- %(asctime)s [%(levelname)s] [%(threadName)s] %(message)s', 
     datefmt='%Y-%m-%d %H:%M:%S')
-
 log = logging.getLogger(__name__)
 
 warnings.filterwarnings('ignore')
 
-PARTITION = int(sys.argv[1])
+# PARTITION = int(sys.argv[1])
 
 counter_lock = Lock()
 
@@ -28,11 +27,11 @@ counter_lock = Lock()
 class Searcher:
 
     def __init__(self) -> None:
+        self.pay = None
         self.session = self.create_session()
         self.proxy_list = load_proxies()
         self.proxy = random.choice(self.proxy_list)
-        self.pay = None
-
+        
 
     def create_session(self):
 
@@ -79,8 +78,9 @@ class Searcher:
                 if retries > 0:
                     time.sleep(1 / random.randint(5, 10))
                 if retries > 1:
-                    self.proxy = random.choice(self.proxy_list)
+                    pass
                 if retries > 2:
+                    self.proxy = random.choice(self.proxy_list)
                     self.session = self.create_session()
                 retries+=1
     
@@ -99,7 +99,7 @@ class Searcher:
     def load(self, f_nm:str, res:dict) -> None:
         global global_counter
         try:
-            with open(f'./case_detail/{f_nm}', 'x', encoding='utf-8') as f:
+            with open(f'./case_details/{f_nm}', 'x', encoding='utf-8') as f:
                 json.dump(res, f, indent=4)
                 with counter_lock: 
                     global_counter -= 1
@@ -120,9 +120,9 @@ def query_payload() -> list[dict]:
                 divisionType,
                 caseNumber
             FROM V_TODO
-            WHERE PART = ?
+            --WHERE PART = ?
         '''
-        res = conn.execute(sql, [PARTITION]).fetchall()
+        res = conn.execute(sql).fetchall()
         return [{'qualifiedFips': r[0], 'courtLevel': r[1], 'divisionType': r[2], 'caseNumber': r[3]} for r in res]
 
     

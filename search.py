@@ -13,7 +13,7 @@ hs = logging.StreamHandler()
 hf = logging.FileHandler('logs.log')
 logging.basicConfig(
     level=logging.INFO, handlers=[hs, hf], 
-    format='xxx -- %(asctime)s [%(levelname)s] [%(threadName)s] %(message)s', 
+    format='xxx -- %(asctime)s [%(levelname)s] %(message)s', 
     datefmt='%Y-%m-%d %H:%M:%S')
 
 log = logging.getLogger(__name__)
@@ -70,11 +70,14 @@ class Searcher:
                     json = self.pay,
                     verify=False,
                     proxies = {'http': self.proxy},
-                    timeout=5
-                ).json()
+                    timeout=1
+                )
+                res = res.json()
                 return res
+            except requests.JSONDecodeError:
+                print(res.content)
             except Exception as e:
-                print(f'{self.pay} {type(e).__name__}: {e}')
+                log.error(f'{self.pay} {type(e).__name__}: {e}')
                 time.sleep(1 / random.randint(5, 10))
                 if retries > 0:
                     time.sleep(1 / random.randint(5, 10))
@@ -89,13 +92,19 @@ class Searcher:
             self.idx = res.get('context').get('entity').get('payload').get('lastResponseIndex')
         else:
             self.idx = None
+        log.info(f'{self.pay} updated self.idx: {self.idx}')
             
     def increase_date(self) -> None: 
         self._date += timedelta(days=1)
 
     def write_json(self, res:dict):
-        with open(f'./case_hearings/{self._date}_{self.idx}.json', 'w', encoding='utf-8') as f:
-            json.dump(res, f, indent=4)
+        f_nm = f'./case_hearings/{self._date}_{self.idx}.json'
+        try:
+            with open(f_nm, 'x', encoding='utf-8') as f:
+                json.dump(res, f, indent=4)
+            log.info(f'{self.pay} successfully written {f_nm}')
+        except Exception as e:
+            log.error(f'{self.pay} {type(e).__name__}: {e}')
 
 
 def load_proxies() -> list:
