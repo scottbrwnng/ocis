@@ -2,22 +2,27 @@ import requests
 import json
 import duckdb as ddb
 import warnings
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from threading import Lock
 import random
 import sys
-import logging
 import time
+import logging
 
 hs = logging.StreamHandler()
 hf = logging.FileHandler('logs.log')
 logging.basicConfig(
     level=logging.INFO, handlers=[hs, hf], 
-    format='%(asctime)s [%(levelname)s] %(message)s', 
+    format='xxx -- %(asctime)s [%(levelname)s] [%(threadName)s] %(message)s', 
     datefmt='%Y-%m-%d %H:%M:%S')
+
 log = logging.getLogger(__name__)
 
 warnings.filterwarnings('ignore')
 
 PARTITION = int(sys.argv[1])
+
+counter_lock = Lock()
 
 
 class Searcher:
@@ -50,32 +55,35 @@ class Searcher:
         }
         s = requests.Session()
         s.headers=headers
-        return s 
+        return s    
 
 
-    def extract(self, pay:dict) -> dict | None: # NOTE: the combination of fips4 and casenumber, and division type should return 1 result
+    def extract(self, pay:dict) -> dict|None: # NOTE: the combination of fips4 and casenumber, and division type should return 1 result
         self.pay = pay
-        retries = 3
-        while retries > 0:                    # - case details required fields in payload are
+        retries = 0
+        while retries < 4:             # - case details required fields in payload are
             try:                       # qualifiedFips, courtLevel, divisionType, caseNumber
-                log.info(f'{self.pay} requesting.....')
+                log.info(f'{self.pay} requesting, retries: {retries}')
                 res = self.session.post(
                     'https://eapps.courts.state.va.us/ocis-rest/api/public/getCaseDetails',
                     json = pay,
                     verify=False,
-                    timeout=2,
+                    timeout=1,
                     proxies = {'http': self.proxy} #, 'https': self.proxy}
                 )
                 res = res.json()['context']['entity']['payload']
                 return res
             except Exception as e:
-                log.error(f'{self.pay} Exception: {e}... {res.content}')
-                self.proxy = random.choice(self.proxy_list)
-                self.session = self.create_session()
-                # ra = 1 / random.randint(50, 100)
-                # time.sleep(ra)
-                retries-=1
-
+                log.error(f'{self.pay} {type(e).__name__}: {e}')
+                time.sleep(1 / random.randint(5, 10))
+                if retries > 0:
+                    time.sleep(1 / random.randint(5, 10))
+                if retries > 1:
+                    self.proxy = random.choice(self.proxy_list)
+                if retries > 2:
+                    self.session = self.create_session()
+                retries+=1
+    
 
     def transform(self, res:dict) -> tuple[str,dict]|None:
         try:
@@ -89,15 +97,18 @@ class Searcher:
 
 
     def load(self, f_nm:str, res:dict) -> None:
-        global counter
+        global global_counter
         try:
             with open(f'./case_detail/{f_nm}', 'x', encoding='utf-8') as f:
                 json.dump(res, f, indent=4)
-            counter += 1
-            log.info(f'{self.pay} written successfully. {counter} requests executed {total_size - counter} remaining.')
+                with counter_lock: 
+                    global_counter -= 1
+                log.info(f'{self.pay} written successfully {total_size - global_counter} requests executed {global_counter} remaining.')
         except FileExistsError:
-            counter += 1
-            log.error(f'{self.pay} already written, skipping write. {counter} requests executed {total_size - counter} remaining.')
+            with counter_lock: 
+                global_counter -= 1
+            log.error(f'{self.pay} already written, skipping write {total_size - global_counter} requests executed {global_counter} remaining.')
+
 
 
 def query_payload() -> list[dict]:
@@ -116,23 +127,38 @@ def query_payload() -> list[dict]:
 
     
 
+def chunk(lst: list, n: int) -> list[list]:
+    k, m = divmod(len(lst), n)
+    return [lst[i * k + min(i, m):(i + 1) * k + min(i + 1, m)] for i in range(n)]
+
+
 def load_proxies() -> list:
     with open('proxies.txt', 'r') as f:
         proxies = f.read().split('\n')
     return proxies
 
 
-
-
-if __name__ == '__main__':
-    payload = query_payload()
-    counter = 0
-    total_size = len(payload)
+def run(payload_group:list[dict]):
     search = Searcher()
-    for pay in payload:
+    for pay in payload_group:
         res = search.extract(pay)
         if not res:
             continue
         file_name, res = search.transform(res)
         if file_name and res:
             search.load(file_name, res)
+
+
+
+if __name__ == '__main__':
+    threads = 8
+    payload = query_payload()
+    payload_groups = chunk(payload, threads)
+
+    global_counter = len(payload)
+    total_size = len(payload)
+    
+    with ThreadPoolExecutor(max_workers=threads) as executor:
+        futures = [executor.submit(run, group) for group in payload_groups]
+        for future in as_completed(futures):
+            future.result()
