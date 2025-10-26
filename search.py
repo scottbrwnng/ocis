@@ -94,7 +94,7 @@ class Searcher:
         self._date += timedelta(days=1)
 
     def write_json(self, res:dict):
-        with open(f'./dumps/{self._date}_{self.idx}.json', 'w', encoding='utf-8') as f:
+        with open(f'./case_hearings/{self._date}_{self.idx}.json', 'w', encoding='utf-8') as f:
             json.dump(res, f, indent=4)
 
 
@@ -106,7 +106,7 @@ def load_proxies() -> list:
 
 def date_range(start_date:date, end_date:date) -> list:
     diff = (end_date-start_date).days
-    old = {datetime.strptime(x[:10], '%Y-%m-%d').date() for x in os.listdir('./dumps') if '.json' in x}
+    old = {datetime.strptime(x[:10], '%Y-%m-%d').date() for x in os.listdir('./case_hearings') if '.json' in x}
     d = []
     for x in range(diff):
         new = start_date + timedelta(days=x)

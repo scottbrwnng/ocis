@@ -91,7 +91,7 @@ class Searcher:
     def load(self, f_nm:str, res:dict) -> None:
         global counter
         try:
-            with open(f'./dtl/{f_nm}', 'x', encoding='utf-8') as f:
+            with open(f'./case_detail/{f_nm}', 'x', encoding='utf-8') as f:
                 json.dump(res, f, indent=4)
             counter += 1
             log.info(f'{self.pay} written successfully. {counter} requests executed {total_size - counter} remaining.')

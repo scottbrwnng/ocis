@@ -4,12 +4,7 @@ import gzip
 import duckdb as ddb
 import shutil
 
-# 1. scrape
-# 2. compress
-# 3. load CASE_DTL_STGN
-# 4. delete dtl folder
-# 5. create dtl folder
-# 6. repeat
+
 
 def table_size() -> int:
     with ddb.connect('ocis') as conn:
@@ -19,24 +14,24 @@ def table_size() -> int:
 
 
 def compress():
-    all_files = os.listdir('./dtl/')
+    all_files = os.listdir('./case_details/')
     size = table_size() + 1
     out = []
     for i, x in enumerate(all_files):
         i += size
-        with open(f'./dtl/{x}', 'rb') as f: 
+        with open(f'./case_details/{x}', 'rb') as f: 
             try:
                 j = json.loads(f.read())
                 out.append(j)
             except Exception as e:
                 print(x, '.....', e)
         if i % 10_000 == 0: 
-            path = os.path.join(f'./dtl_gz/dtl_{i}.json.gz')
+            path = os.path.join(f'./case_details_gz/dtl_{i}.json.gz')
             with gzip.open(path, 'wt') as f:
                 json.dump(out, f)
             print('creating', path)
             out = []
-    path = os.path.join(f'./dtl_gz/dtl_{i}.json.gz')
+    path = os.path.join(f'./case_details_gz/dtl_{i}.json.gz')
     with gzip.open(path, 'wt') as f:
         json.dump(out, f)
     print('creating', path)
@@ -52,7 +47,7 @@ def load_table():
             caseCourt.courtCategoryCode.value as courtLevel,
             caseCategory.caseCategoryCode as divisionType,
             caseTrackingID as caseNumber
-        FROM READ_JSON('./dtl_gz/dtl*.json.gz');
+        FROM READ_JSON('./case_details_gz/dtl*.json.gz');
     '''
     print('loading table...')
     with ddb.connect('ocis') as conn:
@@ -60,10 +55,10 @@ def load_table():
 
 
 def reset_dir():
-    if os.path.exists('./dtl'):
-        shutil.rmtree('./dtl')
-    if not os.path.exists('./dtl'):
-        os.mkdir('./dtl')
+    if os.path.exists('./case_details'):
+        shutil.rmtree('./case_details')
+    if not os.path.exists('./case_details'):
+        os.mkdir('./case_details')
     
 
 

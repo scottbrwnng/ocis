@@ -7,8 +7,8 @@ from threading import Lock
 import random
 import sys
 import time
-
 import logging
+
 hs = logging.StreamHandler()
 hf = logging.FileHandler('logs.log')
 logging.basicConfig(
@@ -99,7 +99,7 @@ class Searcher:
     def load(self, f_nm:str, res:dict) -> None:
         global global_counter
         try:
-            with open(f'./dtl/{f_nm}', 'x', encoding='utf-8') as f:
+            with open(f'./case_detail/{f_nm}', 'x', encoding='utf-8') as f:
                 json.dump(res, f, indent=4)
                 with counter_lock: 
                     global_counter -= 1

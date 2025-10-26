@@ -12,7 +12,7 @@ cells:
           SELECT 
               unnest(context.entity.payload.searchResults, recursive := True) AS HI,
               filename
-          FROM read_json('./dumps/*.json')
+          FROM read_json('./case_hearings/*.json')
       )
 
       SELECT 
@@ -113,7 +113,7 @@ cells:
           caseCourt.courtCategoryCode.value as courtLevel,
           caseCategory.caseCategoryCode as divisionType,
           caseTrackingID as caseNumber
-      FROM READ_JSON('./dtl_gz/dtl*.json.gz');
+      FROM READ_JSON('./case_dtl_gz/dtl*.json.gz');
     metadata: {}
   - kind: 2
     languageId: sql
