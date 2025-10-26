@@ -13,7 +13,7 @@ hs = logging.StreamHandler()
 hf = logging.FileHandler('logs.log')
 logging.basicConfig(
     level=logging.INFO, handlers=[hs, hf], 
-    format='%(asctime)s [%(levelname)s] [%(threadName)s] %(message)s', 
+    format='xxx -- %(asctime)s [%(levelname)s] [%(threadName)s] %(message)s', 
     datefmt='%Y-%m-%d %H:%M:%S')
 
 log = logging.getLogger(__name__)
@@ -61,7 +61,7 @@ class Searcher:
     def extract(self, pay:dict) -> dict|None: # NOTE: the combination of fips4 and casenumber, and division type should return 1 result
         self.pay = pay
         retries = 0
-        while retries < 5:             # - case details required fields in payload are
+        while retries < 4:             # - case details required fields in payload are
             try:                       # qualifiedFips, courtLevel, divisionType, caseNumber
                 log.info(f'{self.pay} requesting, retries: {retries}')
                 res = self.session.post(

@@ -192,9 +192,9 @@ cells:
     metadata: {}
   - kind: 2
     languageId: sql
-    value: |
+    value: >
       select 
-          unnest(string_split(read_text('logs/app.log'), '\n'))
+          string_split(unnest(string_split(content, 'xxx --')), '{', include=true)
       from read_text('./logs.log')
     metadata: {}
   - kind: 2
