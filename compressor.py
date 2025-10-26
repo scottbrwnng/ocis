@@ -2,6 +2,7 @@ import os
 import json
 import gzip
 import duckdb as ddb
+import shutil
 
 # 1. scrape
 # 2. compress
@@ -59,10 +60,10 @@ def load_table():
 
 
 def reset_dir():
-    if os.path.exists('./tes'):
-        os.rmdir('./tes')
-    if not os.path.exists('./tes'):
-        os.mkdir('./tes')
+    if os.path.exists('./dtl'):
+        shutil.rmtree('./dtl')
+    if not os.path.exists('./dtl'):
+        os.mkdir('./dtl')
     
 
 
