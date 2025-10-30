@@ -105,7 +105,7 @@ class Searcher:
     def append_res(self, res:dict) -> None:
         self.output.append(res)
 
-    def load(self, res:dict):
+    def load(self):
         f_nm = f'./case_hearings/{self._date}.json.gz'
         try:
             with gzip.open(f_nm, 'wt') as f:
@@ -142,8 +142,8 @@ def run(single_date:date):
             continue
         search.append_res(res)
         search.last_result_index(res)
-        search.write_json(res)
         if not search.idx:
+            search.load()
             break  # no more results for this date
         
     log.info(f'Finished {single_date}')
