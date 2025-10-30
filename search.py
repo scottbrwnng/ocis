@@ -3,6 +3,7 @@ import json
 from datetime import date, timedelta, datetime
 import warnings
 import random
+import gzip
 import time
 import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -31,6 +32,7 @@ class Searcher:
         self.proxy_list = load_proxies()
         self.proxy = random.choice(self.proxy_list)
         self.idx = None
+        self.output = []
 
 
     def create_session(self):
@@ -99,13 +101,15 @@ class Searcher:
             
     def increase_date(self) -> None: 
         self._date += timedelta(days=1)
+    
+    def append_res(self, res:dict) -> None:
+        self.output.append(res)
 
-    def write_json(self, res:dict):
-        # TODO: append array with payload and response. One array per date, one array per file
-        f_nm = f'./case_hearings_1/{self._date}_{self.idx}.json'
+    def load(self, res:dict):
+        f_nm = f'./case_hearings/{self._date}.json.gz'
         try:
-            with open(f_nm, 'x', encoding='utf-8') as f:
-                json.dump(res, f, indent=4)
+            with gzip.open(f_nm, 'wt') as f:
+                json.dump(self.output, f)
             log.info(f'{self.pay} successfully written {f_nm}')
         except Exception as e:
             log.error(f'{self.pay} {type(e).__name__}: {e}')
@@ -118,8 +122,9 @@ def load_proxies() -> list:
 
 
 def date_range(start_date:date, end_date:date) -> list:
+    # TODO: this needs to be query_payload and pulling from clean datastore
     diff = (end_date-start_date).days
-    old = {datetime.strptime(x[:10], '%Y-%m-%d').date() for x in os.listdir('./case_hearings_1') if '.json' in x}
+    old = {datetime.strptime(x[:10], '%Y-%m-%d').date() for x in os.listdir('./case_hearings') if '.json' in x}
     d = []
     for x in range(diff):
         new = start_date + timedelta(days=x)
@@ -129,28 +134,25 @@ def date_range(start_date:date, end_date:date) -> list:
 
 
 def run(single_date:date):
-    print('running', single_date)
+    log.info(f'Running {single_date}')
     search = Searcher()
     while True:
         res = search.extract(single_date)
         if not res:
             continue
-        search.write_json(res)
+        search.append_res(res)
         search.last_result_index(res)
+        search.write_json(res)
         if not search.idx:
             break  # no more results for this date
-            
-    print('Finished', single_date)
+        
+    log.info(f'Finished {single_date}')
 
 
-def main():
+
+if __name__ == '__main__':
     start_date = date(year = 2010, month = 1, day = 1)
     end_date = date.today()
     dates = date_range(start_date, end_date)
     for d in dates:
         run(d)
-
-
-
-if __name__ == '__main__':
-    main()
