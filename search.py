@@ -101,6 +101,7 @@ class Searcher:
         self._date += timedelta(days=1)
 
     def write_json(self, res:dict):
+        # TODO: append array with payload and response. One array per date, one array per file
         f_nm = f'./case_hearings_1/{self._date}_{self.idx}.json'
         try:
             with open(f_nm, 'x', encoding='utf-8') as f:
