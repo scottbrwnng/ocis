@@ -69,7 +69,7 @@ class Searcher:
                     json = self.pay,
                     verify=False,
                     proxies = {'http': self.proxy},
-                    timeout=10
+                    timeout=5
                 )
                 res = res.json()
                 return res
