@@ -3,7 +3,6 @@ import json
 from datetime import date, timedelta, datetime
 import warnings
 import random
-import uuid
 import time
 import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -59,25 +58,29 @@ class Searcher:
 
     def extract(self, _date:date) -> dict:
         self._date = _date
-        self.pay = {"courtLevels":[],"divisions":["Adult Criminal/Traffic"],"selectedCourts":[],"searchString":[self._date.strftime('%m/%d/%Y')],"searchBy":"HD"}
+        self.pay = {"courtLevels":[],"divisions":[],"selectedCourts":[],"searchString":[self._date.strftime('%m/%d/%Y')],"searchBy":"HD"}
         if self.idx: # may not need if statement
             self.pay.update({"endingIndex":self.idx})
         retries = 0 
-        while retries < 4:
+        while retries < 5:
             try:
                 res = self.session.post(
                     'https://eapps.courts.state.va.us/ocis-rest/api/public/search',
                     json = self.pay,
                     verify=False,
                     proxies = {'http': self.proxy},
-                    timeout=1
+                    timeout=10
                 )
                 res = res.json()
                 return res
             except requests.JSONDecodeError:
-                print(res.content)
+                log.error(res.content)
+            except KeyError as e: # TODO
+                pass
+                # if e == "name='OES_TC_JSESSIONID', domain=None, path=None":
+                    # self.session = self.create_session()
             except Exception as e:
-                log.error(f'{self.pay} {type(e).__name__}: {e}')
+                log.error(f'{self.pay} - retries: {retries} - {type(e).__name__}: {e}')
                 time.sleep(1 / random.randint(5, 10))
                 if retries > 0:
                     time.sleep(1 / random.randint(5, 10))
@@ -98,7 +101,7 @@ class Searcher:
         self._date += timedelta(days=1)
 
     def write_json(self, res:dict):
-        f_nm = f'./case_hearings/{self._date}_{self.idx}.json'
+        f_nm = f'./case_hearings_1/{self._date}_{self.idx}.json'
         try:
             with open(f_nm, 'x', encoding='utf-8') as f:
                 json.dump(res, f, indent=4)
@@ -115,7 +118,7 @@ def load_proxies() -> list:
 
 def date_range(start_date:date, end_date:date) -> list:
     diff = (end_date-start_date).days
-    old = {datetime.strptime(x[:10], '%Y-%m-%d').date() for x in os.listdir('./case_hearings') if '.json' in x}
+    old = {datetime.strptime(x[:10], '%Y-%m-%d').date() for x in os.listdir('./case_hearings_1') if '.json' in x}
     d = []
     for x in range(diff):
         new = start_date + timedelta(days=x)
@@ -135,13 +138,14 @@ def run(single_date:date):
         search.last_result_index(res)
         if not search.idx:
             break  # no more results for this date
+            
     print('Finished', single_date)
 
 
 def main():
-    start_date = date(year = 1980, month = 1, day = 1)
+    start_date = date(year = 2010, month = 1, day = 1)
     end_date = date.today()
-    dates = date_range(start_date, end_date)[10:]
+    dates = date_range(start_date, end_date)
     for d in dates:
         run(d)
 

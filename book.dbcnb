@@ -233,6 +233,18 @@ cells:
     metadata: {}
   - kind: 2
     languageId: sql
+    value: describe
+    metadata: {}
+  - kind: 2
+    languageId: sql
+    value: SELECT * FROM CASE_DTL_STGN LIMIT 100
+    metadata: {}
+  - kind: 2
+    languageId: sql
+    value: COPY CASE_DTL_STGN TO 'case_details.json.gzip'
+    metadata: {}
+  - kind: 2
+    languageId: sql
     value: ""
     metadata: {}
 metadata:
