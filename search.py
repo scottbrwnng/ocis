@@ -6,23 +6,12 @@ import random
 import gzip
 import time
 import os
-from concurrent.futures import ThreadPoolExecutor, as_completed
-import logging
+import boto3
 
-hs = logging.StreamHandler()
-hf = logging.FileHandler('logs.log')
-logging.basicConfig(
-    level=logging.INFO, handlers=[hs, hf], 
-    format='xxx -- %(asctime)s [%(levelname)s] %(message)s', 
-    datefmt='%Y-%m-%d %H:%M:%S')
+warnings.filterwarnings(action='ignore')
 
-log = logging.getLogger(__name__)
-
-warnings.filterwarnings('ignore')
-
-
-
-
+BUCKET_NAME = os.getenv("OUTPUT_BUCKET")  # Set this in Lambda environment variables
+s3 = boto3.client('s3')
 
 
 class Searcher:
@@ -76,13 +65,13 @@ class Searcher:
                 res = res.json()
                 return res
             except requests.JSONDecodeError:
-                log.error(res.content)
+                print(res.content)
             except KeyError as e: # TODO
                 pass
                 # if e == "name='OES_TC_JSESSIONID', domain=None, path=None":
                     # self.session = self.create_session()
             except Exception as e:
-                log.error(f'{self.pay} - retries: {retries} - {type(e).__name__}: {e}')
+                print(f'{self.pay} - retries: {retries} - {type(e).__name__}: {e}')
                 time.sleep(1 / random.randint(5, 10))
                 if retries > 0:
                     time.sleep(1 / random.randint(5, 10))
@@ -97,7 +86,7 @@ class Searcher:
             self.idx = res.get('context').get('entity').get('payload').get('lastResponseIndex')
         else:
             self.idx = None
-        log.info(f'{self.pay} updated self.idx: {self.idx}')
+        print(f'{self.pay} updated self.idx: {self.idx}')
             
     def increase_date(self) -> None: 
         self._date += timedelta(days=1)
@@ -106,13 +95,16 @@ class Searcher:
         self.output.append(res)
 
     def load(self):
-        f_nm = f'./case_hearings/{self._date}.json.gz'
+        f_nm = f'Raw/{self._date}.json.gz'
         try:
-            with gzip.open(f_nm, 'wt') as f:
-                json.dump(self.output, f)
-            log.info(f'{self.pay} successfully written {f_nm}')
+            s3.put_object(
+                Bucket=BUCKET_NAME, 
+                Key=f_nm, 
+                Body=gzip.compress(json.dumps(self.output).encode('utf-8'))
+            )
+            print(f'{self.pay} successfully written {f_nm}')
         except Exception as e:
-            log.error(f'{self.pay} {type(e).__name__}: {e}')
+            print(f'{self.pay} {type(e).__name__}: {e}')
 
 
 def load_proxies() -> list:
@@ -124,7 +116,8 @@ def load_proxies() -> list:
 def date_range(start_date:date, end_date:date) -> list:
     # TODO: this needs to be query_payload and pulling from clean datastore
     diff = (end_date-start_date).days
-    old = {datetime.strptime(x[:10], '%Y-%m-%d').date() for x in os.listdir('./case_hearings') if '.json' in x}
+    # old = {datetime.strptime(x[:10], '%Y-%m-%d').date() for x in os.listdir(BUCKET_NAME) if '.json' in x}
+    old = []
     d = []
     for x in range(diff):
         new = start_date + timedelta(days=x)
@@ -133,26 +126,36 @@ def date_range(start_date:date, end_date:date) -> list:
     return d
 
 
-def run(single_date:date):
-    log.info(f'Running {single_date}')
+def run(search_date:date):
+    print(f'Running {search_date}')
     search = Searcher()
     while True:
-        res = search.extract(single_date)
+        res = search.extract(search_date)
         if not res:
             continue
         search.append_res(res)
         search.last_result_index(res)
         if not search.idx:
             search.load()
+            del search # clear memory
             break  # no more results for this date
-        
-    log.info(f'Finished {single_date}')
-
+    print(f'Finished {search_date}')
 
 
 if __name__ == '__main__':
-    start_date = date(year = 2010, month = 1, day = 1)
+    
+    start_date_str = os.getenv("START_DATE")
+    if start_date_str:
+        start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date()
+    else:
+        start_date = date(year=1993, month=3, day=1)
+
     end_date = date.today()
     dates = date_range(start_date, end_date)
+
     for d in dates:
         run(d)
+
+
+
+
