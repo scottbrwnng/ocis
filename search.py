@@ -82,6 +82,10 @@ class Searcher:
                 retries+=1
 
     def last_result_index(self, res:dict=None) -> None:
+        # TODO: need to need to account for the following error:	
+            # File "/app/search.py", line 85, in last_result_index
+            # if res.get('context').get('entity').get('payload').get('lastResponseIndex'):
+            # AttributeError: 'NoneType' object has no attribute 'get'
         if res.get('context').get('entity').get('payload').get('lastResponseIndex'):
             self.idx = res.get('context').get('entity').get('payload').get('lastResponseIndex')
         else:
